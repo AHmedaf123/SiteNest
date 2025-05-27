@@ -4,17 +4,22 @@ import {
   bookings, 
   reviews, 
   chatSessions,
+  users,
   type Apartment, 
   type Customer, 
   type Booking, 
   type Review, 
   type ChatSession,
+  type User,
   type InsertApartment, 
   type InsertCustomer, 
   type InsertBooking, 
   type InsertReview, 
-  type InsertChatSession 
+  type InsertChatSession,
+  type UpsertUser
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // Apartments
@@ -44,6 +49,10 @@ export interface IStorage {
   getChatSession(sessionId: string): Promise<ChatSession | undefined>;
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   updateChatSession(sessionId: string, updates: Partial<ChatSession>): Promise<ChatSession | undefined>;
+
+  // User operations (for auth)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
 }
 
 export class MemStorage implements IStorage {
@@ -52,6 +61,7 @@ export class MemStorage implements IStorage {
   private bookings: Map<number, Booking>;
   private reviews: Map<number, Review>;
   private chatSessions: Map<string, ChatSession>;
+  private users: Map<string, User>;
   private currentId: { [key: string]: number };
 
   constructor() {
@@ -60,6 +70,7 @@ export class MemStorage implements IStorage {
     this.bookings = new Map();
     this.reviews = new Map();
     this.chatSessions = new Map();
+    this.users = new Map();
     this.currentId = { 
       apartments: 1, 
       customers: 1, 
