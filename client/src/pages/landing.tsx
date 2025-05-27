@@ -1,8 +1,19 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Home, User, Lock, Mail } from "lucide-react";
+import AuthModal from "@/components/auth-modal";
+import { useSimpleAuth } from "@/hooks/useSimpleAuth";
 
 export default function Landing() {
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const { signIn } = useSimpleAuth();
+
+  const handleAuthSuccess = (userData: any) => {
+    signIn(userData);
+    setIsAuthModalOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-coral to-brand-teal flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -22,11 +33,11 @@ export default function Landing() {
           
           <CardContent className="space-y-4">
             <Button 
-              onClick={() => window.location.href = '/api/login'}
+              onClick={() => setIsAuthModalOpen(true)}
               className="w-full bg-brand-coral hover:bg-red-600 text-white py-3 text-lg font-semibold"
             >
               <User className="mr-2" />
-              Sign In with Replit
+              Sign In / Sign Up
             </Button>
             
             <div className="relative">
@@ -61,6 +72,12 @@ export default function Landing() {
           </CardContent>
         </Card>
       </div>
+
+      <AuthModal 
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
     </div>
   );
 }

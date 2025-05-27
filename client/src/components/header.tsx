@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Home, Menu, X, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
+import { useSimpleAuth } from "@/hooks/useSimpleAuth";
 
 export default function Header() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, signOut } = useSimpleAuth();
 
   const isActive = (path: string) => location === path;
 
@@ -93,7 +93,7 @@ export default function Header() {
                   Book Now
                 </Button>
                 <Button 
-                  onClick={() => window.location.href = '/api/logout'}
+                  onClick={signOut}
                   variant="outline"
                   size="sm"
                   className="hidden md:flex items-center space-x-2"
@@ -104,7 +104,7 @@ export default function Header() {
               </>
             ) : (
               <Button 
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.reload()}
                 className="bg-brand-coral text-white hover:bg-red-600 transition-colors"
               >
                 Sign In
@@ -157,7 +157,7 @@ export default function Header() {
               </button>
               {isAuthenticated && user && (
                 <Button 
-                  onClick={() => window.location.href = '/api/logout'}
+                  onClick={signOut}
                   variant="outline"
                   size="sm"
                   className="flex items-center space-x-2 mt-4"
