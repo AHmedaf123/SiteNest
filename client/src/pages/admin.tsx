@@ -21,6 +21,8 @@ interface ApartmentFormData {
   bathrooms: string;
   squareFeet: string;
   imageUrl: string;
+  images: string;
+  videoUrl: string;
   amenities: string;
 }
 
@@ -36,6 +38,8 @@ export default function Admin() {
     bathrooms: "",
     squareFeet: "",
     imageUrl: "",
+    images: "",
+    videoUrl: "",
     amenities: "",
   });
   const { toast } = useToast();
@@ -134,6 +138,8 @@ export default function Admin() {
       bathrooms: "",
       squareFeet: "",
       imageUrl: "",
+      images: "",
+      videoUrl: "",
       amenities: "",
     });
   };

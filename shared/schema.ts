@@ -11,7 +11,9 @@ export const apartments = pgTable("apartments", {
   bedrooms: integer("bedrooms").notNull(),
   bathrooms: integer("bathrooms").notNull(),
   squareFeet: integer("square_feet").notNull(),
-  imageUrl: text("image_url").notNull(),
+  imageUrl: text("image_url").notNull(), // Main image for backward compatibility
+  images: text("images").array(), // Multiple images
+  videoUrl: text("video_url"), // Optional video URL
   amenities: text("amenities").array(),
 });
 

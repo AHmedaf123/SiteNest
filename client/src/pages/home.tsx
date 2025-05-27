@@ -1,7 +1,7 @@
 import Header from "@/components/header";
 import Hero from "@/components/hero";
 import About from "@/components/about";
-import ApartmentCarousel from "@/components/apartment-carousel";
+import EnhancedApartmentCarousel from "@/components/enhanced-apartment-carousel";
 import WhyChooseUs from "@/components/why-choose-us";
 import Reviews from "@/components/reviews";
 import FAQ from "@/components/faq";
@@ -15,7 +15,7 @@ export default function Home() {
       <Header />
       <Hero />
       <About />
-      <ApartmentCarousel />
+      <EnhancedApartmentCarousel />
       <WhyChooseUs />
       <Reviews />
       <FAQ />
