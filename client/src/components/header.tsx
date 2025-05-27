@@ -47,12 +47,12 @@ export default function Header() {
             >
               About
             </button>
-            <button 
-              onClick={() => scrollToSection('listings')}
-              className="text-primary hover:text-brand-coral transition-colors"
+            <Link 
+              href="/apartments" 
+              className={`transition-colors ${isActive('/apartments') ? 'text-brand-coral' : 'text-primary hover:text-brand-coral'}`}
             >
               Apartments
-            </button>
+            </Link>
             <Link 
               href="/calendar" 
               className={`transition-colors ${isActive('/calendar') ? 'text-brand-coral' : 'text-primary hover:text-brand-coral'}`}

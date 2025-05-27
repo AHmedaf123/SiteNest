@@ -7,6 +7,7 @@ import { useSimpleAuth } from "@/hooks/useSimpleAuth";
 import Home from "@/pages/home";
 import Calendar from "@/pages/calendar";
 import Admin from "@/pages/admin";
+import Apartments from "@/pages/apartments";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -20,6 +21,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Home} />
+          <Route path="/apartments" component={Apartments} />
           <Route path="/calendar" component={Calendar} />
           <Route path="/admin" component={Admin} />
         </>
