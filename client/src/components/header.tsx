@@ -155,6 +155,17 @@ export default function Header() {
               >
                 Contact
               </button>
+              {isAuthenticated && user && (
+                <Button 
+                  onClick={() => window.location.href = '/api/logout'}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2 mt-4"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </Button>
+              )}
             </div>
           </div>
         )}
