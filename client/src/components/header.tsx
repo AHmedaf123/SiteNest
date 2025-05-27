@@ -59,6 +59,12 @@ export default function Header() {
             >
               Calendar
             </Link>
+            <Link 
+              href="/admin" 
+              className={`transition-colors ${isActive('/admin') ? 'text-brand-coral' : 'text-primary hover:text-brand-coral'}`}
+            >
+              Manage Listings
+            </Link>
             <button 
               onClick={() => scrollToSection('contact')}
               className="text-primary hover:text-brand-coral transition-colors"

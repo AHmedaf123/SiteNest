@@ -220,9 +220,28 @@ export class MemStorage implements IStorage {
 
   async createApartment(insertApartment: InsertApartment): Promise<Apartment> {
     const id = this.currentId.apartments++;
-    const apartment: Apartment = { ...insertApartment, id, amenities: insertApartment.amenities || null };
+    const apartment: Apartment = { 
+      ...insertApartment, 
+      id, 
+      amenities: insertApartment.amenities || null,
+      bathrooms: insertApartment.bathrooms || 1,
+      squareFeet: insertApartment.squareFeet || 650
+    };
     this.apartments.set(id, apartment);
     return apartment;
+  }
+
+  async updateApartment(id: number, updates: Partial<Apartment>): Promise<Apartment | undefined> {
+    const existing = this.apartments.get(id);
+    if (!existing) return undefined;
+    
+    const updated: Apartment = { ...existing, ...updates };
+    this.apartments.set(id, updated);
+    return updated;
+  }
+
+  async deleteApartment(id: number): Promise<boolean> {
+    return this.apartments.delete(id);
   }
 
   // Customer methods
