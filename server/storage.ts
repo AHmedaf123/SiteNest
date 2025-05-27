@@ -218,7 +218,7 @@ export class MemStorage implements IStorage {
 
   async createApartment(insertApartment: InsertApartment): Promise<Apartment> {
     const id = this.currentId.apartments++;
-    const apartment: Apartment = { ...insertApartment, id };
+    const apartment: Apartment = { ...insertApartment, id, amenities: insertApartment.amenities || null };
     this.apartments.set(id, apartment);
     return apartment;
   }
@@ -314,6 +314,9 @@ export class MemStorage implements IStorage {
     const session: ChatSession = { 
       ...insertSession, 
       id, 
+      data: insertSession.data || null,
+      customerId: insertSession.customerId || null,
+      currentStep: insertSession.currentStep || 0,
       createdAt: new Date() 
     };
     this.chatSessions.set(insertSession.sessionId, session);
@@ -327,6 +330,37 @@ export class MemStorage implements IStorage {
     const updatedSession = { ...session, ...updates };
     this.chatSessions.set(sessionId, updatedSession);
     return updatedSession;
+  }
+
+  // User authentication methods
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const existingUser = this.users.get(userData.id);
+    
+    if (existingUser) {
+      const updatedUser: User = {
+        ...existingUser,
+        ...userData,
+        updatedAt: new Date()
+      };
+      this.users.set(userData.id, updatedUser);
+      return updatedUser;
+    } else {
+      const newUser: User = {
+        ...userData,
+        email: userData.email || null,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        profileImageUrl: userData.profileImageUrl || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.users.set(userData.id, newUser);
+      return newUser;
+    }
   }
 }
 

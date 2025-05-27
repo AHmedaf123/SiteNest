@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Menu, X } from "lucide-react";
+import { Home, Menu, X, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Header() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, isAuthenticated } = useAuth();
 
   const isActive = (path: string) => location === path;
 
@@ -66,12 +68,48 @@ export default function Header() {
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button 
-              onClick={openBookingModal}
-              className="bg-brand-coral text-white hover:bg-red-600 transition-colors"
-            >
-              Book Now
-            </Button>
+            {isAuthenticated && user ? (
+              <>
+                <div className="hidden md:flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-full bg-brand-coral flex items-center justify-center">
+                    {user.profileImageUrl ? (
+                      <img 
+                        src={user.profileImageUrl} 
+                        alt={user.firstName || 'User'} 
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <User className="text-white text-sm" />
+                    )}
+                  </div>
+                  <span className="text-sm text-primary">
+                    {user.firstName || user.email || 'User'}
+                  </span>
+                </div>
+                <Button 
+                  onClick={openBookingModal}
+                  className="bg-brand-coral text-white hover:bg-red-600 transition-colors"
+                >
+                  Book Now
+                </Button>
+                <Button 
+                  onClick={() => window.location.href = '/api/logout'}
+                  variant="outline"
+                  size="sm"
+                  className="hidden md:flex items-center space-x-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </Button>
+              </>
+            ) : (
+              <Button 
+                onClick={() => window.location.href = '/api/login'}
+                className="bg-brand-coral text-white hover:bg-red-600 transition-colors"
+              >
+                Sign In
+              </Button>
+            )}
             <button 
               className="md:hidden text-primary"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
