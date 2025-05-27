@@ -1,0 +1,99 @@
+
+🧠 Prompt for Repl.AI:
+Build a complete React.js or Next.js-based web application for a rental company named "Side Nest".
+
+🌐 Home Page Structure:
+Header + Welcome Section
+
+Display a welcome message like: “Welcome to Side Nest – Stay with us and feel at home.”
+
+Include some dummy content or visuals as placeholders.
+
+About Us Section
+
+Content about "Side Nest", a company that rents out:
+
+One-bed
+
+Two-bed
+
+Three-bed apartments
+
+Apartment Listings Section
+
+Dynamically render apartment listings in cards (3 per view).
+
+Each card contains: an apartment image, short description, and a “Book Now” button.
+
+Implement carousel/scrolling behavior:
+
+Every 2–3 seconds, show the next 3 apartments in a loop.
+
+Why Choose Us Section
+
+Showcase stats or key benefits to attract users (e.g. number of rooms, satisfied customers, cities served).
+
+Reviews Section
+
+Display user testimonials or reviews.
+
+FAQ Section
+
+Include common user questions and answers.
+
+Footer Section
+
+Standard footer content with contact links, social icons, and basic info.
+
+🤖 Chatbot Functionality on Home Page:
+Implement a chatbot that:
+
+Asks user: name, phone number, CNIC.
+
+Validates phone number via a 6-digit PIN.
+
+Checks room availability based on user interest (e.g. Room 714).
+
+Pulls from a centralized calendar to confirm availability.
+
+Checks confirmation amount status and booking confirmation.
+
+📅 Calendar Page:
+Room Selection Dropdown
+
+List of all available rooms.
+
+When a room is selected (e.g. 714), a calendar view appears.
+
+Calendar View
+
+Show booking status for selected room across dates.
+
+Highlight booked dates, available dates, etc.
+
+CSV Data View Below the Calendar
+
+Show:
+
+Booking status
+
+Last check-in info
+
+Guest name
+
+Checkout date
+
+Host name
+
+Confirmation amount status (paid/unpaid)
+
+🛠 Tech & Notes:
+Use React.js or Next.js
+
+Use TailwindCSS or styled-components for UI
+
+Integrate dummy data for all rooms, bookings, reviews, etc.
+
+You may use tools like React Query or SWR for API data handling
+
+For the chatbot, use a simple dialog-based UI or integrate a library like BotUI or build a custom flow
