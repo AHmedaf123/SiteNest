@@ -99,53 +99,7 @@ export default function About() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-8 md:p-12 shadow-lg">
-          <h3 className="text-3xl font-bold text-center mb-8">Why Choose Side Nest?</h3>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h4 className="text-xl font-semibold mb-4 flex items-center">
-                <MapPin className="text-brand-coral mr-3" />
-                Prime Locations
-              </h4>
-              <p className="text-secondary mb-6">
-                All our properties are strategically located in the heart of major cities, providing easy access to business districts, 
-                shopping centers, restaurants, and public transportation. Whether you're traveling for business or leisure, 
-                you'll find yourself perfectly positioned to explore and enjoy your destination.
-              </p>
-              
-              <h4 className="text-xl font-semibold mb-4 flex items-center">
-                <Star className="text-brand-coral mr-3" />
-                Exceptional Standards
-              </h4>
-              <p className="text-secondary">
-                Every property in our portfolio undergoes rigorous quality checks and meets our premium standards. 
-                From luxury furnishings to high-end appliances, we ensure that every detail contributes to your comfort and satisfaction.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="text-xl font-semibold mb-4 flex items-center">
-                <Users className="text-brand-coral mr-3" />
-                Dedicated Support Team
-              </h4>
-              <p className="text-secondary mb-6">
-                Our experienced hospitality team is available 24/7 to assist with any questions or concerns. 
-                From check-in to check-out, we're here to ensure your stay is seamless and memorable. 
-                Our local experts can also provide recommendations for dining, entertainment, and attractions.
-              </p>
-              
-              <h4 className="text-xl font-semibold mb-4 flex items-center">
-                <Shield className="text-brand-coral mr-3" />
-                Trust & Safety
-              </h4>
-              <p className="text-secondary">
-                Your safety and security are our top priorities. All properties feature secure access systems, 
-                and our verification process ensures that both guests and hosts meet our community standards. 
-                We also provide comprehensive insurance coverage for your peace of mind.
-              </p>
-            </div>
-          </div>
-        </div>
+
       </div>
     </section>
   );
