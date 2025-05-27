@@ -9,6 +9,8 @@ export const apartments = pgTable("apartments", {
   description: text("description").notNull(),
   price: integer("price").notNull(), // price per night in dollars
   bedrooms: integer("bedrooms").notNull(),
+  bathrooms: integer("bathrooms").notNull(),
+  squareFeet: integer("square_feet").notNull(),
   imageUrl: text("image_url").notNull(),
   amenities: text("amenities").array(),
 });

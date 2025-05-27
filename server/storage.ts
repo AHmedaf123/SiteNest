@@ -27,6 +27,8 @@ export interface IStorage {
   getApartment(id: number): Promise<Apartment | undefined>;
   getApartmentByRoomNumber(roomNumber: string): Promise<Apartment | undefined>;
   createApartment(apartment: InsertApartment): Promise<Apartment>;
+  updateApartment(id: number, updates: Partial<Apartment>): Promise<Apartment | undefined>;
+  deleteApartment(id: number): Promise<boolean>;
 
   // Customers
   getCustomer(id: number): Promise<Customer | undefined>;
