@@ -24,6 +24,8 @@ export function useSimpleAuth() {
   const signIn = (userData: User) => {
     setUser(userData);
     localStorage.setItem('sideNestUser', JSON.stringify(userData));
+    // Force immediate update to show home page
+    window.location.href = '/';
   };
 
   const signOut = () => {
