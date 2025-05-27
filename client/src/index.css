@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 24 10% 28%;
+  --muted: 210 11% 96%;
+  --muted-foreground: 24 5% 45%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 24 10% 28%;
+  --card: 0 0% 100%;
+  --card-foreground: 24 10% 28%;
+  --border: 210 11% 89%;
+  --input: 210 11% 89%;
+  --primary: 4 91% 68%;
+  --primary-foreground: 210 100% 99%;
+  --secondary: 210 11% 96%;
+  --secondary-foreground: 24 10% 28%;
+  --accent: 170 90% 51%;
+  --accent-foreground: 210 100% 99%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 60 9% 98%;
+  --ring: 4 91% 68%;
+  --radius: 0.5rem;
+  
+  /* Brand colors */
+  --brand-coral: 4 91% 68%;
+  --brand-teal: 170 90% 51%;
+  --text-primary: 24 10% 28%;
+  --text-secondary: 24 5% 45%;
+  --bg-light: 210 11% 96%;
+}
+
+.dark {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
+  --popover: 240 10% 4%;
+  --popover-foreground: 0 0% 98%;
+  --card: 240 10% 4%;
+  --card-foreground: 0 0% 98%;
+  --border: 240 4% 16%;
+  --input: 240 4% 16%;
+  --primary: 4 91% 68%;
+  --primary-foreground: 210 100% 99%;
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 170 90% 51%;
+  --accent-foreground: 210 100% 99%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 240 5% 84%;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .brand-coral {
+    color: hsl(var(--brand-coral));
+  }
+  
+  .bg-brand-coral {
+    background-color: hsl(var(--brand-coral));
+  }
+  
+  .brand-teal {
+    color: hsl(var(--brand-teal));
+  }
+  
+  .bg-brand-teal {
+    background-color: hsl(var(--brand-teal));
+  }
+  
+  .text-primary {
+    color: hsl(var(--text-primary));
+  }
+  
+  .text-secondary {
+    color: hsl(var(--text-secondary));
+  }
+  
+  .bg-light {
+    background-color: hsl(var(--bg-light));
+  }
+  
+  @keyframes slideIn {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  
+  @keyframes bounceSubtle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  
+  .animate-slide-in {
+    animation: slideIn 0.5s ease-out;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out;
+  }
+  
+  .animate-bounce-subtle {
+    animation: bounceSubtle 2s infinite;
+  }
+}
