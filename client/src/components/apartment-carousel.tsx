@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import ApartmentBookingButton from "@/components/apartment-booking-button";
 import type { Apartment } from "@shared/schema";
 
 export default function ApartmentCarousel() {
@@ -94,12 +95,12 @@ export default function ApartmentCarousel() {
                       <p className="text-secondary mb-4">{apartment.description}</p>
                       <div className="flex justify-between items-center">
                         <span className="text-2xl font-bold brand-coral">${apartment.price}/night</span>
-                        <Button 
-                          onClick={() => openBookingModal(apartment.roomNumber)}
-                          className="bg-brand-coral text-white hover:bg-red-600 transition-colors"
-                        >
-                          Book Now
-                        </Button>
+                        <ApartmentBookingButton
+                          apartmentId={apartment.id}
+                          roomNumber={apartment.roomNumber}
+                          className="bg-brand-coral text-white hover:bg-red-600"
+                          size="md"
+                        />
                       </div>
                     </CardContent>
                   </Card>

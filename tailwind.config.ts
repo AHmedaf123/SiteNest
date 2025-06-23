@@ -44,6 +44,18 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        // SiteNest Premium Color Tokens - Brand Colors from Logo
+        "sitenest-primary": "hsl(var(--sitenest-primary))",      // SiteNest Blue
+        "sitenest-secondary": "hsl(var(--sitenest-secondary))",  // SiteNest Gold
+        "sitenest-background": "hsl(var(--sitenest-background))", // Pearl White
+        "sitenest-text": "hsl(var(--sitenest-text))",          // Charcoal Gray
+        "sitenest-hover-button": "hsl(var(--sitenest-hover-button))", // Lighter Gold
+        "sitenest-hover-card": "hsl(var(--sitenest-hover-card))", // Cool Gray
+        // Legacy compatibility
+        "sitenest-navy": "hsl(var(--sitenest-navy))",           // SiteNest Blue
+        "sitenest-blue": "hsl(var(--sitenest-blue))",          // SiteNest Blue
+        "brand-coral": "hsl(var(--brand-coral))",              // SiteNest Gold
+        "brand-teal": "hsl(var(--brand-teal))",                // SiteNest Blue
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",

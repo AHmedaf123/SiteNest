@@ -3,11 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>SiteNest - Your Home Away From Home</title>
+    <meta name="description" content="SiteNest offers premium apartment rentals in Islamabad. Book your perfect stay with us - one-bed, two-bed apartments with modern amenities." />
+    <link rel="icon" type="image/svg+xml" href="/assets/branding/sitenest-icon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
-    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+    <script type="text/javascript">
+      // Only load Replit banner in Replit environment to avoid YouTube domain errors
+      if (window.location.hostname.includes('replit.dev') || window.location.hostname.includes('repl.co')) {
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = 'https://replit.com/public/js/replit-dev-banner.js';
+        script.onerror = function() {
+          console.warn('Replit banner script failed to load - this is normal outside Replit environment');
+        };
+        document.head.appendChild(script);
+      }
+    </script>
   </body>
 </html>

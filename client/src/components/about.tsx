@@ -5,9 +5,9 @@ export default function About() {
     <section id="about" className="py-20 bg-light">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-6">About Side Nest</h2>
+          <h2 className="text-4xl font-bold mb-6">About SiteNest</h2>
           <p className="text-xl text-secondary max-w-4xl mx-auto mb-8">
-            Founded in 2018, Side Nest has revolutionized the apartment rental experience by combining luxury accommodations 
+            Founded in 2018, SiteNest has revolutionized the apartment rental experience by combining luxury accommodations 
             with exceptional service. We believe that every guest deserves a home away from home, complete with modern amenities, 
             prime locations, and unparalleled comfort.
           </p>
@@ -50,7 +50,7 @@ export default function About() {
               <div className="w-16 h-16 bg-brand-coral rounded-full flex items-center justify-center mb-6 mx-auto">
                 <Bed className="text-white text-2xl" />
               </div>
-              <h4 className="text-2xl font-semibold mb-4 text-center">One-Bed Apartments</h4>
+              <h4 className="text-2xl font-semibold mb-4 text-center">Studio Apartments</h4>
               <p className="text-secondary text-center mb-4">
                 Perfect for solo travelers or couples seeking a cozy, intimate space with all modern amenities.
               </p>
@@ -67,7 +67,7 @@ export default function About() {
               <div className="w-16 h-16 bg-brand-teal rounded-full flex items-center justify-center mb-6 mx-auto">
                 <Home className="text-white text-2xl" />
               </div>
-              <h4 className="text-2xl font-semibold mb-4 text-center">Two-Bed Apartments</h4>
+              <h4 className="text-2xl font-semibold mb-4 text-center">One-Bed Apartment</h4>
               <p className="text-secondary text-center mb-4">
                 Ideal for small families or friends, offering comfortable living with separate bedrooms and shared spaces.
               </p>
@@ -84,7 +84,7 @@ export default function About() {
               <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mb-6 mx-auto">
                 <Building className="text-white text-2xl" />
               </div>
-              <h4 className="text-2xl font-semibold mb-4 text-center">Three-Bed Apartments</h4>
+              <h4 className="text-2xl font-semibold mb-4 text-center">Two-Bed Apartments</h4>
               <p className="text-secondary text-center mb-4">
                 Spacious accommodations for larger groups or families, featuring multiple bedrooms and generous living areas.
               </p>

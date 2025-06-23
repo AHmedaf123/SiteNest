@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1748580511553,
+      "tag": "0000_brave_hedge_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1748639178363,
+      "tag": "0001_tan_anthem",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1748705255540,
+      "tag": "0002_ancient_agent_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1748773954204,
+      "tag": "0003_fantastic_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1749550532814,
+      "tag": "0004_amusing_speedball",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1749588010206,
+      "tag": "0005_fantastic_tigra",
+      "breakpoints": true
+    }
+  ]
+}

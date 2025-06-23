@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Play, Star, MapPin, Bed, Bath, Square } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, MapPin, Bed, Bath, Square } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import ApartmentBookingButton from "@/components/apartment-booking-button";
 import type { Apartment } from "@shared/schema";
 
 export default function EnhancedApartmentCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState<{[key: number]: number}>({});
-  const [showVideo, setShowVideo] = useState<{[key: number]: boolean}>({});
 
   const { data: apartments = [], isLoading } = useQuery<Apartment[]>({
     queryKey: ["/api/apartments"],
@@ -50,15 +50,10 @@ export default function EnhancedApartmentCarousel() {
     }));
   };
 
-  const toggleVideo = (apartmentId: number) => {
-    setShowVideo(prev => ({
-      ...prev,
-      [apartmentId]: !prev[apartmentId]
-    }));
-  };
-
-  const openBookingModal = () => {
-    const event = new CustomEvent('openBookingModal');
+  const openBookingModal = (roomNumber: string) => {
+    const event = new CustomEvent('openBookingModal', {
+      detail: { roomId: roomNumber }
+    });
     window.dispatchEvent(event);
   };
 
@@ -128,82 +123,50 @@ export default function EnhancedApartmentCarousel() {
                 apartment.imageUrl,
                 ...(apartment.images || [])
               ].filter(Boolean);
-              
+
               const currentImg = currentImageIndex[apartment.id] || 0;
-              const isVideoShown = showVideo[apartment.id] || false;
 
               return (
-                <Card 
-                  key={apartment.id} 
+                <Card
+                  key={apartment.id}
                   className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 animate-slide-up"
                   style={{ animationDelay: `${index * 150}ms` }}
                 >
                   <div className="relative overflow-hidden rounded-t-xl h-64">
-                    {!isVideoShown ? (
+                    <img
+                      src={allImages[currentImg] || apartment.imageUrl}
+                      alt={apartment.title}
+                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                    />
+                    {allImages.length > 1 && (
                       <>
-                        <img
-                          src={allImages[currentImg] || apartment.imageUrl}
-                          alt={apartment.title}
-                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
-                        />
-                        {allImages.length > 1 && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => prevImage(apartment.id, allImages.length)}
-                              className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 text-white hover:bg-black/50"
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => nextImage(apartment.id, allImages.length)}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 text-white hover:bg-black/50"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
-                              {allImages.map((_, imgIndex) => (
-                                <div
-                                  key={imgIndex}
-                                  className={`w-2 h-2 rounded-full ${
-                                    imgIndex === currentImg ? 'bg-white' : 'bg-white/50'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                          </>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => prevImage(apartment.id, allImages.length)}
+                          className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 text-white hover:bg-black/50"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => nextImage(apartment.id, allImages.length)}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 text-white hover:bg-black/50"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
+                          {allImages.map((_, imgIndex) => (
+                            <div
+                              key={imgIndex}
+                              className={`w-2 h-2 rounded-full ${
+                                imgIndex === currentImg ? 'bg-white' : 'bg-white/50'
+                              }`}
+                            />
+                          ))}
+                        </div>
                       </>
-                    ) : (
-                      <div className="w-full h-full bg-black flex items-center justify-center">
-                        {apartment.videoUrl ? (
-                          <iframe
-                            src={apartment.videoUrl}
-                            className="w-full h-full"
-                            allowFullScreen
-                            title={`${apartment.title} Video Tour`}
-                          />
-                        ) : (
-                          <div className="text-white text-center">
-                            <Play className="h-12 w-12 mx-auto mb-2" />
-                            <p>Video not available</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {apartment.videoUrl && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleVideo(apartment.id)}
-                        className="absolute top-2 right-2 bg-black/30 text-white hover:bg-black/50"
-                      >
-                        <Play className="h-4 w-4" />
-                      </Button>
                     )}
 
                     <Badge className="absolute top-2 left-2 bg-brand-coral text-white">
@@ -266,12 +229,12 @@ export default function EnhancedApartmentCarousel() {
                         </span>
                         <span className="text-secondary text-sm">/night</span>
                       </div>
-                      <Button 
-                        onClick={openBookingModal}
-                        className="bg-brand-coral hover:bg-red-600 text-white px-6 py-2"
-                      >
-                        Book Now
-                      </Button>
+                      <ApartmentBookingButton
+                        apartmentId={apartment.id}
+                        roomNumber={apartment.roomNumber}
+                        className="bg-brand-coral hover:bg-red-600 text-white"
+                        size="md"
+                      />
                     </div>
                   </CardContent>
                 </Card>

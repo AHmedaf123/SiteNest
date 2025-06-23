@@ -31,6 +31,8 @@ export function useSimpleAuth() {
   const signOut = () => {
     setUser(null);
     localStorage.removeItem('sideNestUser');
+    // Always redirect to home page after signout
+    window.location.href = '/';
   };
 
   return {
