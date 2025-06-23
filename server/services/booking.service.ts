@@ -4,6 +4,7 @@
  */
 
 import { BaseService } from './base.service';
+import { AvailabilityService } from './availability.service';
 import { 
   BookingNotAvailableError, 
   ValidationError, 
@@ -55,12 +56,16 @@ export interface BookingSearchFilters {
 }
 
 export class BookingService extends BaseService {
+  private availabilityService: AvailabilityService;
+
   constructor() {
     super('BookingService');
+    this.availabilityService = new AvailabilityService();
   }
 
   /**
    * Check apartment availability for given dates
+   * Now uses the centralized AvailabilityService
    */
   async checkAvailability(query: BookingAvailabilityQuery): Promise<{
     isAvailable: boolean;
@@ -70,58 +75,18 @@ export class BookingService extends BaseService {
     return this.executeWithRetry(async () => {
       this.logOperation('checkAvailability', query);
 
-      // Validate date range
-      const dateValidation = InputValidator.validateDateRange(query.checkIn, query.checkOut);
-      if (!dateValidation.valid) {
-        return {
-          isAvailable: false,
-          reason: dateValidation.error
-        };
-      }
-
-      const { checkInDate, checkOutDate } = dateValidation;
-
-      // Check if apartment exists
-      const apartment = await this.db
-        .select()
-        .from(apartments)
-        .where(eq(apartments.id, query.apartmentId))
-        .limit(1);
-
-      if (apartment.length === 0) {
-        throw new RecordNotFoundError('Apartment', query.apartmentId.toString());
-      }
-
-      // Check for conflicting bookings
-      // Two bookings conflict if they overlap in any way:
-      // Booking A conflicts with Booking B if: A.checkIn < B.checkOut AND A.checkOut > B.checkIn
-      const whereConditions = [
-        eq(bookings.apartmentId, query.apartmentId),
-        // Exclude cancelled bookings
-        ne(bookings.status, 'cancelled'),
-        // Check for date overlap: new booking checkIn < existing checkOut AND new booking checkOut > existing checkIn
-        and(
-          gte(bookings.checkOut, checkInDate!.toISOString()),
-          lte(bookings.checkIn, checkOutDate!.toISOString())
-        )
-      ];
-
-      // Exclude specific booking if provided (for updates)
-      if (query.excludeBookingId) {
-        whereConditions.push(ne(bookings.id, query.excludeBookingId));
-      }
-
-      const conflictingBookings = await this.db
-        .select()
-        .from(bookings)
-        .where(and(...whereConditions));
-
-      const isAvailable = conflictingBookings.length === 0;
+      const result = await this.availabilityService.checkAvailability({
+        apartmentId: query.apartmentId,
+        checkIn: query.checkIn,
+        checkOut: query.checkOut,
+        excludeBookingId: query.excludeBookingId,
+        includePendingReservations: true
+      });
 
       return {
-        isAvailable,
-        reason: isAvailable ? undefined : 'Apartment is not available for the selected dates',
-        conflictingBookings: isAvailable ? undefined : conflictingBookings
+        isAvailable: result.isAvailable,
+        reason: result.reason,
+        conflictingBookings: result.conflictingBookings
       };
     }, 'checkAvailability', query);
   }

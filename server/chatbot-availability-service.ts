@@ -4,6 +4,7 @@
  */
 
 import { storage } from './storage';
+import { AvailabilityService } from './services/availability.service';
 import { log } from './utils/logger';
 
 interface AvailabilityRequest {
@@ -11,6 +12,7 @@ interface AvailabilityRequest {
   checkOut?: string;
   roomNumber?: string;
   guestCount?: number;
+  excludeApartmentId?: number;
 }
 
 interface AvailabilityResult {
@@ -24,6 +26,8 @@ interface AvailabilityResult {
 }
 
 interface RoomAvailabilityInfo {
+  id: number;
+  apartmentId: number;
   roomNumber: string;
   title: string;
   price: number;
@@ -34,13 +38,14 @@ interface RoomAvailabilityInfo {
 }
 
 export class ChatbotAvailabilityService {
+  private static availabilityService = new AvailabilityService();
   
   /**
    * Check availability for chatbot queries
    */
   static async checkAvailability(request: AvailabilityRequest): Promise<AvailabilityResult> {
     try {
-      const { checkIn, checkOut, roomNumber, guestCount } = request;
+      const { checkIn, checkOut, roomNumber, guestCount, excludeApartmentId } = request;
 
       // If no dates provided, show available rooms for today
       if (!checkIn || !checkOut) {
@@ -71,7 +76,7 @@ export class ChatbotAvailabilityService {
 
       // If specific room requested
       if (roomNumber) {
-        return await this.checkSpecificRoom(roomNumber, checkIn, checkOut);
+        return await this.checkSpecificRoom(roomNumber, checkIn, checkOut, excludeApartmentId);
       }
 
       // General availability check
@@ -109,6 +114,8 @@ export class ChatbotAvailabilityService {
 
         if (isAvailable) {
           availableRooms.push({
+            id: apartment.id,
+            apartmentId: apartment.id,
             roomNumber: apartment.roomNumber,
             title: apartment.title,
             price: apartment.price,
@@ -144,7 +151,7 @@ export class ChatbotAvailabilityService {
   /**
    * Check availability for a specific room
    */
-  private static async checkSpecificRoom(roomNumber: string, checkIn: string, checkOut: string): Promise<AvailabilityResult> {
+  private static async checkSpecificRoom(roomNumber: string, checkIn: string, checkOut: string, excludeApartmentId?: number): Promise<AvailabilityResult> {
     try {
       const requestedRoom = await storage.getApartmentByRoomNumber(roomNumber);
       
@@ -180,8 +187,9 @@ export class ChatbotAvailabilityService {
           }
         };
       } else {
-        // Find alternatives
-        const alternatives = await this.findAlternativeRooms(checkIn, checkOut, requestedRoom.id);
+        // Find alternatives (exclude the unavailable apartment)
+        const excludeId = excludeApartmentId || requestedRoom.id;
+        const alternatives = await this.findAlternativeRooms(checkIn, checkOut, excludeId);
         
         if (alternatives.length > 0) {
           return {
@@ -230,6 +238,8 @@ export class ChatbotAvailabilityService {
           }
 
           availableRooms.push({
+            id: apartment.id,
+            apartmentId: apartment.id,
             roomNumber: apartment.roomNumber,
             title: apartment.title,
             price: apartment.price,
@@ -296,6 +306,8 @@ export class ChatbotAvailabilityService {
 
         if (isAvailable) {
           alternatives.push({
+            id: apartment.id,
+            apartmentId: apartment.id,
             roomNumber: apartment.roomNumber,
             title: apartment.title,
             price: apartment.price,

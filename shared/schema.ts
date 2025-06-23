@@ -79,6 +79,8 @@ export const users = pgTable("users", {
   address: text("address"),
   // Role-based access control
   role: varchar("role").notNull().default("customer"), // 'customer', 'affiliate', 'admin', 'super_admin'
+  // Affiliate commission rate (for individual commission control)
+  commissionRate: integer("commission_rate").default(10), // Commission percentage for affiliates (0-100)
   // Verification fields
   isEmailVerified: boolean("is_email_verified").default(false),
   isPhoneVerified: boolean("is_phone_verified").default(false),

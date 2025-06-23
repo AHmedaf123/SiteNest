@@ -89,6 +89,70 @@ export class AIService {
         conversationContexts.set(sessionId, context);
       }
 
+      // Handle unavailability flow initialization
+      if (bookingData && bookingData.isUnavailable && userMessage.includes("not available")) {
+        const checkInDate = new Date(bookingData.checkIn).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const checkOutDate = new Date(bookingData.checkOut).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        // Check for alternative rooms
+        const availabilityService = new (await import('./chatbot-availability-service')).ChatbotAvailabilityService();
+        const availabilityResult = await availabilityService.checkAvailability({
+          checkIn: bookingData.checkIn,
+          checkOut: bookingData.checkOut,
+          roomNumber: bookingData.roomId
+        });
+
+        if (availabilityResult.alternatives && availabilityResult.alternatives.length > 0) {
+          const response = `I'm sorry, Room ${bookingData.roomId} is not available from ${checkInDate} to ${checkOutDate}. However, I found these other available options for you:`;
+          
+          context.messages.push({
+            role: 'assistant',
+            content: response,
+            timestamp: new Date()
+          });
+
+          return {
+            response,
+            quickActions: ['open_whatsapp', 'check_other_dates', 'contact_support'],
+            type: 'availability_carousel',
+            data: {
+              type: 'availability_carousel',
+              apartments: availabilityResult.alternatives.map(room => ({
+                ...room,
+                apartmentId: room.id || room.apartmentId,
+                roomNumber: room.roomNumber,
+                title: room.title,
+                price: room.price,
+                bedrooms: room.bedrooms,
+                imageUrl: room.imageUrl,
+                description: room.description
+              }))
+            }
+          };
+        } else {
+          const response = `I'm sorry, Room ${bookingData.roomId} is not available from ${checkInDate} to ${checkOutDate}, and we don't have any alternative rooms available for those dates. Please try different dates or contact our support team at 0311-5197087 for more options.`;
+          
+          context.messages.push({
+            role: 'assistant',
+            content: response,
+            timestamp: new Date()
+          });
+
+          return {
+            response,
+            quickActions: ['check_other_dates', 'open_whatsapp', 'contact_support']
+          };
+        }
+      }
+
       // Handle booking flow initialization
       if (bookingData && userMessage === "Starting booking process") {
         const checkInDate = new Date(bookingData.checkIn).toLocaleDateString('en-US', {

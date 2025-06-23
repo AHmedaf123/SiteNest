@@ -574,7 +574,8 @@ export class MemStorage implements IStorage {
       const updatedUser: User = {
         ...existingUser,
         ...userData,
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        commissionRate: userData.commissionRate ?? existingUser.commissionRate
       };
       this.users.set(userData.id, updatedUser);
       return updatedUser;
@@ -599,7 +600,8 @@ export class MemStorage implements IStorage {
         phoneVerificationToken: userData.phoneVerificationToken || null,
         googleId: userData.googleId || null,
         authProvider: userData.authProvider || null,
-        role: userData.role || 'customer'
+        role: userData.role || 'customer',
+        commissionRate: userData.commissionRate ?? 10
       };
       this.users.set(userData.id, newUser);
       return newUser;

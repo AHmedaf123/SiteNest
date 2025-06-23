@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -344,6 +345,7 @@ export default function AffiliateManagement() {
   const [rejectWithdrawalDialog, setRejectWithdrawalDialog] = useState<{ open: boolean, requestId?: number, notes: string }>({ open: false, notes: "" });
   const [markPaidDialog, setMarkPaidDialog] = useState<{ open: boolean, requestId?: number }>({ open: false });
   const [restrictAffiliateDialog, setRestrictAffiliateDialog] = useState<{ open: boolean, affiliateId?: number, reason: string }>({ open: false, reason: "" });
+  const [editCommissionDialog, setEditCommissionDialog] = useState<{ open: boolean, affiliateId?: string, currentRate: number, newRate: string }>({ open: false, currentRate: 10, newRate: "" });
 
   // Disable auto-refresh completely to prevent rate limiting
   const refetchInterval = false;
@@ -771,6 +773,42 @@ export default function AffiliateManagement() {
     },
   });
 
+  // Update commission rate mutation
+  const updateCommissionRateMutation = useMutation({
+    mutationFn: async ({ affiliateId, commissionRate }: { affiliateId: string; commissionRate: number }) => {
+      const token = localStorage.getItem('sitenest_token');
+      const response = await fetch(`/api/affiliate/admin/commission-rate/${affiliateId}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ commissionRate }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update commission rate");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["allAffiliates"] });
+      queryClient.invalidateQueries({ queryKey: ["affiliatePerformance"] });
+      toast({ 
+        title: "Success", 
+        description: `Commission rate updated to ${data.affiliate?.commissionRate}% successfully.` 
+      });
+      setEditCommissionDialog({ open: false, affiliateId: undefined, currentRate: 10, newRate: "" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update commission rate.",
+        variant: "destructive"
+      });
+    },
+  });
+
   // Handlers
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -863,6 +901,33 @@ export default function AffiliateManagement() {
       affiliateId, 
       isRestricted: false 
     });
+  };
+
+  const handleEditCommissionRate = (affiliateId: string, currentRate: number) => {
+    setEditCommissionDialog({ 
+      open: true, 
+      affiliateId, 
+      currentRate, 
+      newRate: currentRate.toString() 
+    });
+  };
+
+  const confirmUpdateCommissionRate = () => {
+    if (editCommissionDialog.affiliateId && editCommissionDialog.newRate) {
+      const newRate = parseFloat(editCommissionDialog.newRate);
+      if (isNaN(newRate) || newRate < 0 || newRate > 100) {
+        toast({
+          title: "Invalid Commission Rate",
+          description: "Commission rate must be a number between 0 and 100.",
+          variant: "destructive"
+        });
+        return;
+      }
+      updateCommissionRateMutation.mutate({ 
+        affiliateId: editCommissionDialog.affiliateId, 
+        commissionRate: newRate 
+      });
+    }
   };
 
   return (
@@ -1388,6 +1453,31 @@ export default function AffiliateManagement() {
                             </div>
                           </div>
                           
+                          {/* Commission Rate Control */}
+                          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Settings className="h-5 w-5 text-gray-600" />
+                                <span className="font-medium text-gray-700">Commission Rate:</span>
+                                <Badge variant="secondary" className="text-lg font-bold">
+                                  {affiliate.commissionRate || affiliate.commission_rate || 10}%
+                                </Badge>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditCommissionRate(
+                                  affiliate.id, 
+                                  affiliate.commissionRate || affiliate.commission_rate || 10
+                                )}
+                                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit Rate
+                              </Button>
+                            </div>
+                          </div>
+
                           {/* Performance Stats Grid */}
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                             <div className="text-center p-3 bg-blue-50 rounded">
@@ -1569,6 +1659,62 @@ export default function AffiliateManagement() {
             >
               <AlertTriangle className="h-4 w-4 mr-1" />
               Restrict Affiliate
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Commission Rate Dialog */}
+      <Dialog open={editCommissionDialog.open} onOpenChange={open => setEditCommissionDialog({ ...editCommissionDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Commission Rate</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Set the commission rate for this affiliate. This will be used for all future earnings calculations.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="commission-rate">Commission Rate (%)</Label>
+              <Input
+                id="commission-rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                placeholder="Enter commission rate (0-100)"
+                value={editCommissionDialog.newRate}
+                onChange={e => setEditCommissionDialog({ ...editCommissionDialog, newRate: e.target.value })}
+                className="text-center text-lg font-semibold"
+              />
+              <p className="text-xs text-gray-500">
+                Current rate: {editCommissionDialog.currentRate}% • Valid range: 0-100%
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setEditCommissionDialog({ open: false, affiliateId: undefined, currentRate: 10, newRate: "" })}
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-blue-600 text-white" 
+              disabled={!editCommissionDialog.newRate || updateCommissionRateMutation.isPending}
+              onClick={confirmUpdateCommissionRate}
+            >
+              {updateCommissionRateMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Settings className="h-4 w-4 mr-1" />
+                  Update Rate
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>

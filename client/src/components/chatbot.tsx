@@ -19,6 +19,17 @@ interface Message {
   isTyping?: boolean;
 }
 
+interface ConversationContext {
+  lastMessageType?: string;
+  lastBotResponse?: string;
+  timestamp?: Date;
+  [key: string]: any;
+}
+
+interface UserPreferences {
+  [key: string]: any;
+}
+
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -27,8 +38,8 @@ export default function Chatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const [quickActions, setQuickActions] = useState<string[]>(['open_whatsapp', 'check_availability', 'pricing']);
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationContext, setConversationContext] = useState<any>({});
-  const [userPreferences, setUserPreferences] = useState<any>({});
+  const [conversationContext, setConversationContext] = useState<ConversationContext>({});
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>({});
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [userSatisfaction, setUserSatisfaction] = useState<number | null>(null);
@@ -118,12 +129,60 @@ export default function Chatbot() {
       }, 500);
     };
 
+    // Listen for room unavailability events
+    const handleOpenChatbotWithUnavailability = (event: any) => {
+      const { roomId, apartmentId, checkIn, checkOut, user: userData } = event.detail;
+
+      setIsOpen(true);
+
+      // Clear previous messages and start conversation flow
+      setMessages([]);
+
+      // Start the unavailability conversation flow
+      setTimeout(async () => {
+        const unavailabilityData = {
+          roomId,
+          apartmentId,
+          checkIn,
+          checkOut,
+          user: userData,
+          isUnavailable: true
+        };
+
+        // Initialize session first if not already done
+        if (!sessionId) {
+          try {
+            console.log("🔄 Initializing chat session for unavailability...");
+            const response = await apiRequest("POST", "/api/chat/session");
+            const session = await response.json();
+            setSessionId(session.sessionId);
+            console.log("✅ Session created:", session.sessionId);
+
+            // Send unavailability message to get alternatives
+            console.log("📤 Sending unavailability message with data:", unavailabilityData);
+            await sendAIMessage(`Room ${roomId} is not available from ${checkIn} to ${checkOut}. Please show me alternatives.`, session.sessionId, undefined, unavailabilityData);
+          } catch (error) {
+            console.error("❌ Failed to initialize chat session:", error);
+            // Fallback to direct message without session
+            addMessage(`I'm sorry, Room ${roomId} is not available for the selected dates. Let me help you find alternatives!`, false);
+            setQuickActions(['check_availability', 'open_whatsapp', 'contact_info']);
+          }
+        } else {
+          // Session already exists, send unavailability message
+          console.log("📤 Using existing session, sending unavailability message:", sessionId);
+          await sendAIMessage(`Room ${roomId} is not available from ${checkIn} to ${checkOut}. Please show me alternatives.`, undefined, undefined, unavailabilityData);
+        }
+      }, 500);
+    };
+
     window.addEventListener('openChatbot', handleOpenChatbot);
     window.addEventListener('openChatbotWithBooking', handleOpenChatbotWithBooking);
+    window.addEventListener('openChatbotWithUnavailability', handleOpenChatbotWithUnavailability);
 
     return () => {
       window.removeEventListener('openChatbot', handleOpenChatbot);
       window.removeEventListener('openChatbotWithBooking', handleOpenChatbotWithBooking);
+      window.removeEventListener('openChatbotWithUnavailability', handleOpenChatbotWithUnavailability);
     };
   }, [messages.length, sessionId]);
 
@@ -405,6 +464,28 @@ export default function Chatbot() {
 
 
 
+  const handleRoomSelection = (room: any) => {
+    // Navigate to apartment detail page with the selected room highlighted
+    const apartmentId = room.apartmentId || room.id;
+    const roomNumber = room.roomNumber;
+    
+    // Close chatbot
+    setIsOpen(false);
+    
+    // Navigate to apartment detail page
+    if (apartmentId) {
+      // Use React Router navigation if available, otherwise use window.location
+      const apartmentUrl = `/apartment/${apartmentId}?room=${roomNumber}&highlight=true`;
+      window.location.href = apartmentUrl;
+    } else {
+      // Fallback: navigate to apartments page
+      window.location.href = '/apartments';
+    }
+    
+    // Add a message to indicate the selection
+    addMessage(`Great choice! Redirecting you to Room ${roomNumber} details...`, false);
+  };
+
   const handleQuickAction = async (action: string, payload?: string) => {
     // Handle satisfaction ratings
     if (action.startsWith('satisfaction_')) {
@@ -680,24 +761,14 @@ export default function Chatbot() {
                             )}
                           </div>
                         </div>
-                        <div className="flex flex-col space-y-1 ml-2">
+                        <div className="flex flex-col ml-2">
                           <Button
                             size="sm"
-                            onClick={() => handleQuickAction('book_room', `I want to book room ${room.roomNumber}`)}
+                            onClick={() => handleRoomSelection(room)}
                             className="bg-sitenest-primary hover:bg-sitenest-secondary text-xs px-2 py-1"
                           >
-                            Select
+                            Select Room
                           </Button>
-                          {room.imageUrl && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => window.open(room.imageUrl, '_blank')}
-                              className="text-xs px-2 py-1"
-                            >
-                              View
-                            </Button>
-                          )}
                         </div>
                       </div>
                     </div>

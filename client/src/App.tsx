@@ -17,7 +17,6 @@ import TwoStepVerification from "@/components/two-step-verification";
 import NotFound from "@/pages/not-found";
 import Careers from "@/pages/careers";
 import AffiliateDashboard from "@/pages/affiliate-dashboard";
-import TestAffiliate from "@/pages/test-affiliate";
 import { useState } from "react";
 
 function Router() {
@@ -40,7 +39,6 @@ function Router() {
         <Route path="/apartment/:id" component={ApartmentDetail} />
         <Route path="/landing" component={Landing} />
         <Route path="/careers" component={Careers} />
-        <Route path="/test-affiliate" component={TestAffiliate} />
 
         {/* Protected routes - require authentication */}
         {isAuthenticated ? (

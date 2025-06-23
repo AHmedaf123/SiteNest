@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths } from "date-fns";
+import { format, parse, startOfWeek, getDay, isAfter, isBefore, isEqual } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,15 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DatePicker } from "@/components/ui/date-picker";
+
 import { downloadCSV } from "@/utils/csvExport";
 import type { Apartment, Booking, Customer } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useSimpleAuth } from "@/hooks/useSimpleAuth";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
 import { bookingValidation } from "@shared/schema";
-import { Search, Calendar as CalendarIcon, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Search, CheckCircle } from "lucide-react";
 
 // Extended booking type that includes client information
 interface ExtendedBooking extends Booking {
@@ -30,37 +29,7 @@ interface ExtendedBooking extends Booking {
   notes?: string;
 }
 
-// Interface for room availability data
-interface RoomAvailability {
-  id: number;
-  roomNumber: number;
-  title: string;
-  description: string;
-  pricePerNight: number;
-  maxGuests: number;
-  amenities: string[];
-  images: string[];
-  isAvailable: boolean;
-  booking?: {
-    id: number;
-    hostName: string;
-    checkIn: string;
-    checkOut: string;
-    status: string;
-    paymentStatus: string;
-  } | null;
-}
 
-// Interface for the API response
-interface RoomsAvailabilityResponse {
-  date: string;
-  rooms: RoomAvailability[];
-  summary: {
-    total: number;
-    available: number;
-    booked: number;
-  };
-}
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 const locales = {
@@ -86,12 +55,16 @@ export default function RoomCalendar() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deletingBooking, setDeletingBooking] = useState<ExtendedBooking | null>(null);
 
-  // Date search functionality state
-  const [searchDate, setSearchDate] = useState<Date | undefined>(undefined);
-  const [showDateSearch, setShowDateSearch] = useState(false);
-
   // Calendar navigation state
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Room availability search state
+  const [availabilitySearch, setAvailabilitySearch] = useState({
+    checkIn: "",
+    checkOut: "",
+    isSearching: false
+  });
+  const [availableRooms, setAvailableRooms] = useState<Apartment[]>([]);
 
   // Auto-populate host name from user profile
   const getHostName = () => {
@@ -351,6 +324,208 @@ export default function RoomCalendar() {
     setIsEditModalOpen(true);
   };
 
+  // Function to check if dates overlap (strict overlap check)
+  const datesOverlap = (
+    start1: Date, 
+    end1: Date, 
+    start2: Date, 
+    end2: Date
+  ): boolean => {
+    // Two date ranges overlap if:
+    // start1 < end2 AND start2 < end1
+    // This handles all overlap scenarios including:
+    // - Partial overlaps (start or end within existing booking)
+    // - Complete containment (new booking within existing or vice versa)
+    // - Exact matches
+    return isBefore(start1, end2) && isBefore(start2, end1);
+  };
+
+  // Function to check room availability for given dates
+  const checkRoomAvailability = (apartmentId: number, checkIn: string, checkOut: string): boolean => {
+    if (!checkIn || !checkOut) return false;
+    
+    const requestedCheckIn = new Date(checkIn);
+    const requestedCheckOut = new Date(checkOut);
+    
+    // Validate that check-out is after check-in
+    if (!isAfter(requestedCheckOut, requestedCheckIn)) {
+      return false;
+    }
+    
+    // Find all active bookings for this apartment
+    const apartmentBookings = allBookings.filter(booking => 
+      booking.apartmentId === apartmentId && 
+      (booking.status === 'booked' || booking.status === 'pending')
+    );
+    
+    // Check if any booking overlaps with requested dates
+    for (const booking of apartmentBookings) {
+      const bookingCheckIn = new Date(booking.checkIn);
+      const bookingCheckOut = new Date(booking.checkOut);
+      
+      // Skip invalid booking dates
+      if (!bookingCheckIn || !bookingCheckOut || !isAfter(bookingCheckOut, bookingCheckIn)) {
+        continue;
+      }
+      
+      if (datesOverlap(requestedCheckIn, requestedCheckOut, bookingCheckIn, bookingCheckOut)) {
+        return false; // Room is not available due to overlap
+      }
+    }
+    
+    return true; // Room is available
+  };
+
+  // Function to search for available rooms
+  const searchAvailableRooms = () => {
+    // Validation
+    if (!availabilitySearch.checkIn || !availabilitySearch.checkOut) {
+      toast({
+        title: "Validation Error",
+        description: "Please select both check-in and check-out dates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const checkInDate = new Date(availabilitySearch.checkIn);
+    const checkOutDate = new Date(availabilitySearch.checkOut);
+    const now = new Date();
+
+    // Check if dates are valid
+    if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter valid dates.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if check-out is after check-in
+    if (!isAfter(checkOutDate, checkInDate)) {
+      toast({
+        title: "Validation Error",
+        description: "Check-out date must be after check-in date.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if check-in is not in the past
+    if (isBefore(checkInDate, now)) {
+      toast({
+        title: "Validation Error",
+        description: "Check-in date cannot be in the past.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAvailabilitySearch(prev => ({ ...prev, isSearching: true }));
+
+    try {
+      // Filter available rooms
+      const available = apartments.filter(apartment => 
+        checkRoomAvailability(apartment.id, availabilitySearch.checkIn, availabilitySearch.checkOut)
+      );
+
+      setAvailableRooms(available);
+
+      // Show appropriate message
+      if (available.length === 0) {
+        toast({
+          title: "No Rooms Available",
+          description: "No rooms are available for the selected dates. Please try different dates.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Search Complete",
+          description: `Found ${available.length} available room${available.length !== 1 ? 's' : ''} for your selected dates.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error searching for available rooms:', error);
+      toast({
+        title: "Search Error",
+        description: "An error occurred while searching for available rooms. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAvailabilitySearch(prev => ({ ...prev, isSearching: false }));
+    }
+  };
+
+  // Function to select a room from availability results
+  const selectRoomFromAvailability = (apartmentId: number) => {
+    setSelectedRoomId(apartmentId.toString());
+    
+    // Pre-populate booking form with searched dates if available
+    if (availabilitySearch.checkIn && availabilitySearch.checkOut) {
+      setFormData(prev => ({
+        ...prev,
+        checkIn: availabilitySearch.checkIn,
+        checkOut: availabilitySearch.checkOut,
+        hostName: getHostName()
+      }));
+    }
+    
+    // Scroll to calendar section
+    setTimeout(() => {
+      const calendarSection = document.getElementById('calendar-section');
+      if (calendarSection) {
+        calendarSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+
+    // Show success message
+    const selectedApartment = apartments.find(apt => apt.id === apartmentId);
+    if (selectedApartment) {
+      toast({
+        title: "Room Selected",
+        description: `Room ${selectedApartment.roomNumber} selected. Calendar view updated below.`,
+      });
+    }
+  };
+
+  // Function to clear availability search
+  const clearAvailabilitySearch = () => {
+    setAvailabilitySearch({
+      checkIn: "",
+      checkOut: "",
+      isSearching: false
+    });
+    setAvailableRooms([]);
+  };
+
+  // Function to quick book a room from availability results
+  const quickBookRoom = (apartmentId: number) => {
+    setSelectedRoomId(apartmentId.toString());
+    
+    // Pre-populate booking form with searched dates
+    if (availabilitySearch.checkIn && availabilitySearch.checkOut) {
+      setFormData(prev => ({
+        ...prev,
+        checkIn: availabilitySearch.checkIn,
+        checkOut: availabilitySearch.checkOut,
+        hostName: getHostName()
+      }));
+    }
+    
+    // Open booking modal
+    setIsBookingModalOpen(true);
+
+    // Show success message
+    const selectedApartment = apartments.find(apt => apt.id === apartmentId);
+    if (selectedApartment) {
+      toast({
+        title: "Quick Booking",
+        description: `Booking form opened for Room ${selectedApartment.roomNumber} with your selected dates.`,
+      });
+    }
+  };
+
   const { data: apartments = [] } = useQuery<Apartment[]>({
     queryKey: ["/api/apartments"],
     refetchInterval: 30000, // Refetch every 30 seconds for real-time sync
@@ -381,20 +556,19 @@ export default function RoomCalendar() {
     },
   });
 
-  // Fetch rooms availability by date (for admin and affiliate users)
-  const { data: roomsAvailability, isLoading: isLoadingAvailability } = useQuery<RoomsAvailabilityResponse>({
-    queryKey: ["/api/rooms-availability-by-date", searchDate?.toISOString().split('T')[0]],
+  // Fetch all bookings for availability checking
+  const { data: allBookings = [] } = useQuery<Booking[]>({
+    queryKey: ["/api/bookings/all"],
     queryFn: async () => {
-      if (!searchDate) return null;
-      const dateString = searchDate.toISOString().split('T')[0];
-      const response = await fetch(`/api/rooms-availability-by-date?date=${dateString}`);
+      const response = await fetch('/api/bookings');
       if (!response.ok) {
-        throw new Error('Failed to fetch rooms availability');
+        throw new Error('Failed to fetch all bookings');
       }
       return response.json();
     },
-    enabled: !!searchDate && (isAdmin() || isAffiliate()),
   });
+
+
 
   // Map bookings with real client information from customers
   const bookingsWithClients: ExtendedBooking[] = bookings.map(booking => {
@@ -535,210 +709,234 @@ export default function RoomCalendar() {
           <p className="text-gray-600">Manage room availability and bookings across all properties</p>
         </div>
 
-        {/* Main Tabs */}
-        <Tabs defaultValue="search" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="search" className="flex items-center space-x-2">
-              <Search className="h-4 w-4" />
-              <span>Date Search & Availability</span>
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center space-x-2">
-              <CalendarIcon className="h-4 w-4" />
-              <span>Room Calendar & Bookings</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Date Search Tab */}
-          <TabsContent value="search" className="space-y-6">
-            {(isAdmin() || isAffiliate()) ? (
-              <>
-                {/* Date Search Section */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Search className="h-5 w-5" />
-                      Search Room Availability by Date
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-col sm:flex-row gap-4 items-end">
-                      <div className="flex-1 max-w-sm">
-                        <Label htmlFor="search-date">Select Date</Label>
-                        <DatePicker
-                          date={searchDate}
-                          onDateChange={setSearchDate}
-                          placeholder="Pick a date to search"
-                          className="mt-1"
-                        />
-                      </div>
-                      <Button
-                        onClick={() => setShowDateSearch(!!searchDate)}
-                        disabled={!searchDate}
-                        className="bg-sitenest-primary hover:bg-sitenest-primary/90"
-                      >
-                        <Search className="h-4 w-4 mr-2" />
-                        Search Availability
-                      </Button>
-                      {searchDate && (
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setSearchDate(undefined);
-                            setShowDateSearch(false);
-                          }}
-                        >
-                          Clear Search
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Date Search Results */}
-                {showDateSearch && searchDate && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <CalendarIcon className="h-5 w-5" />
-                        Room Availability for {format(searchDate, 'PPPP')}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {isLoadingAvailability ? (
-                        <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sitenest-primary mx-auto"></div>
-                          <p className="mt-2 text-gray-600">Loading room availability...</p>
-                        </div>
-                      ) : roomsAvailability ? (
+        {/* Calendar Section */}
+        <div className="space-y-6">
+          {/* Room Availability Search */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                Check Room Availability
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Enter your desired check-in and check-out dates to see all available rooms
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="availability-checkin">Check-in Date & Time</Label>
+                    <Input
+                      id="availability-checkin"
+                      type="datetime-local"
+                      value={availabilitySearch.checkIn}
+                      onChange={(e) => setAvailabilitySearch(prev => ({ 
+                        ...prev, 
+                        checkIn: e.target.value 
+                      }))}
+                      min={new Date().toISOString().slice(0, 16)}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500">Select your arrival date and time</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="availability-checkout">Check-out Date & Time</Label>
+                    <Input
+                      id="availability-checkout"
+                      type="datetime-local"
+                      value={availabilitySearch.checkOut}
+                      onChange={(e) => setAvailabilitySearch(prev => ({ 
+                        ...prev, 
+                        checkOut: e.target.value 
+                      }))}
+                      min={availabilitySearch.checkIn || new Date().toISOString().slice(0, 16)}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500">Select your departure date and time</p>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Button 
+                      onClick={searchAvailableRooms}
+                      disabled={availabilitySearch.isSearching || !availabilitySearch.checkIn || !availabilitySearch.checkOut}
+                      className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                    >
+                      {availabilitySearch.isSearching ? (
                         <>
-                          {/* Summary */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <Card>
-                              <CardContent className="pt-6">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-blue-600">{roomsAvailability.summary.total}</div>
-                                  <p className="text-sm text-gray-600">Total Rooms</p>
-                                </div>
-                              </CardContent>
-                            </Card>
-                            <Card>
-                              <CardContent className="pt-6">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-green-600">{roomsAvailability.summary.available}</div>
-                                  <p className="text-sm text-gray-600">Available</p>
-                                </div>
-                              </CardContent>
-                            </Card>
-                            <Card>
-                              <CardContent className="pt-6">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-red-600">{roomsAvailability.summary.booked}</div>
-                                  <p className="text-sm text-gray-600">Booked</p>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </div>
-
-                          {/* Rooms Grid */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {roomsAvailability.rooms.map((room) => (
-                              <Card key={room.id} className={`border-2 ${room.isAvailable ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-                                <CardContent className="pt-6">
-                                  <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-semibold text-lg">Room {room.roomNumber}</h3>
-                                    {room.isAvailable ? (
-                                      <Badge variant="default" className="bg-green-600">
-                                        <CheckCircle className="h-3 w-3 mr-1" />
-                                        Available
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="destructive">
-                                        <XCircle className="h-3 w-3 mr-1" />
-                                        Booked
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-gray-600 mb-2">{room.title}</p>
-                                  <p className="text-sm font-medium text-sitenest-primary mb-3">
-                                    PKR {room.pricePerNight.toLocaleString()}/night
-                                  </p>
-                                  <p className="text-xs text-gray-500 mb-3">
-                                    Max {room.maxGuests} guests
-                                  </p>
-
-                                  {!room.isAvailable && room.booking && (
-                                    <div className="mt-3 p-3 bg-white rounded border">
-                                      <p className="text-xs font-medium text-gray-700 mb-1">Current Booking:</p>
-                                      <p className="text-xs text-gray-600">Host: {room.booking.hostName}</p>
-                                      <p className="text-xs text-gray-600">
-                                        {format(new Date(room.booking.checkIn), 'MMM dd')} - {format(new Date(room.booking.checkOut), 'MMM dd')}
-                                      </p>
-                                      <div className="flex gap-1 mt-1">
-                                        <Badge variant="outline" className="text-xs">
-                                          {room.booking.status}
-                                        </Badge>
-                                        <Badge variant="outline" className="text-xs">
-                                          {room.booking.paymentStatus}
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Searching...
                         </>
                       ) : (
-                        <div className="text-center py-8 text-gray-500">
-                          No data available for the selected date.
-                        </div>
+                        <>
+                          <Search className="h-4 w-4 mr-2" />
+                          Search Rooms
+                        </>
                       )}
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Access Restricted</h3>
-                    <p className="text-gray-600">Date search functionality is available for admin and affiliate users only.</p>
+                    </Button>
+                    {(availabilitySearch.checkIn || availabilitySearch.checkOut || availableRooms.length > 0) && (
+                      <Button 
+                        onClick={clearAvailabilitySearch}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Clear
+                      </Button>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Calendar Tab */}
-          <TabsContent value="calendar" className="space-y-6">
-            {/* Room Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Select Room</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="max-w-md">
-                  <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a room to view calendar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {apartments.map((apartment) => (
-                        <SelectItem key={apartment.id} value={apartment.id.toString()}>
-                          Room {apartment.roomNumber} - {apartment.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
-              </CardContent>
-            </Card>
+
+                {/* Available Rooms Results */}
+                {availableRooms.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        Available Rooms ({availableRooms.length})
+                      </h3>
+                      <div className="text-sm text-gray-600">
+                        {availabilitySearch.checkIn && availabilitySearch.checkOut && (
+                          <span>
+                            {format(new Date(availabilitySearch.checkIn), 'MMM dd, yyyy')} - {format(new Date(availabilitySearch.checkOut), 'MMM dd, yyyy')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {availableRooms.map((apartment) => {
+                        // Calculate total nights and cost
+                        const checkInDate = new Date(availabilitySearch.checkIn);
+                        const checkOutDate = new Date(availabilitySearch.checkOut);
+                        const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+                        const totalCost = nights * apartment.price;
+                        const discountedPrice = apartment.discountPercentage 
+                          ? apartment.price * (1 - apartment.discountPercentage / 100)
+                          : apartment.price;
+                        const discountedTotal = nights * discountedPrice;
+
+                        return (
+                          <Card 
+                            key={apartment.id} 
+                            className="cursor-pointer hover:shadow-lg transition-all duration-200 border-green-200 bg-green-50 hover:bg-green-100"
+                            onClick={() => selectRoomFromAvailability(apartment.id)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-semibold text-green-800">
+                                  Room {apartment.roomNumber}
+                                </h4>
+                                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                  Available
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-700 mb-3 font-medium">{apartment.title}</p>
+                              
+                              <div className="space-y-2 mb-3">
+                                <div className="flex items-center justify-between text-xs text-gray-600">
+                                  <span>{apartment.bedrooms} bed • {apartment.bathrooms} bath</span>
+                                  <span>{apartment.squareFeet} sq ft</span>
+                                </div>
+                                
+                                <div className="text-sm">
+                                  {apartment.discountPercentage && apartment.discountPercentage > 0 ? (
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="line-through text-gray-500">PKR {apartment.price}</span>
+                                        <Badge variant="destructive" className="text-xs">
+                                          {apartment.discountPercentage}% OFF
+                                        </Badge>
+                                      </div>
+                                      <div className="font-medium text-green-600">
+                                        PKR {Math.round(discountedPrice)}/night
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="font-medium text-green-600">
+                                      PKR {apartment.price}/night
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="text-xs text-gray-600 pt-1 border-t border-green-200">
+                                  <div className="flex justify-between">
+                                    <span>{nights} night{nights !== 1 ? 's' : ''}</span>
+                                    <span className="font-medium">
+                                      Total: PKR {apartment.discountPercentage ? Math.round(discountedTotal) : totalCost}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="border-green-600 text-green-600 hover:bg-green-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    selectRoomFromAvailability(apartment.id);
+                                  }}
+                                >
+                                  View Calendar
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    quickBookRoom(apartment.id);
+                                  }}
+                                >
+                                  Quick Book
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* No rooms available message */}
+                {availabilitySearch.checkIn && availabilitySearch.checkOut && 
+                 availableRooms.length === 0 && !availabilitySearch.isSearching && (
+                  <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-800 text-center">
+                      No rooms are available for the selected dates. Please try different dates.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Room Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Room</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="max-w-md">
+                <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a room to view calendar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {apartments.map((apartment) => (
+                      <SelectItem key={apartment.id} value={apartment.id.toString()}>
+                        Room {apartment.roomNumber} - {apartment.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
             {selectedRoomId && selectedApartment ? (
               <>
                 {/* Calendar View */}
-                <Card>
+                <Card id="calendar-section">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>
@@ -970,8 +1168,7 @@ export default function RoomCalendar() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-        </Tabs>
+        </div>
 
         {/* Add the booking modal */}
         {isBookingModalOpen && (
@@ -1334,12 +1531,3 @@ export default function RoomCalendar() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

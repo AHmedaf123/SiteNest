@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useRealAuth } from "@/hooks/useRealAuth";
 import { useBookingDates } from "@/contexts/BookingContext";
 import Logo from "@/components/ui/logo";
+import { fetchWithRetry } from "@/utils/retry";
+import { rateLimitHelper } from "@/utils/rate-limit-helper";
 
 export default function BookingModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,6 +19,8 @@ export default function BookingModal() {
     checkIn: "",
     checkOut: ""
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSubmitTime, setLastSubmitTime] = useState<number>(0);
   const { isAuthenticated, user } = useRealAuth();
   const { setBookingDates } = useBookingDates();
 
@@ -74,8 +78,46 @@ export default function BookingModal() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent double submission and rate limiting
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTime;
+    const minInterval = 2000; // 2 seconds minimum between submissions
+
+    if (isSubmitting) {
+      toast({
+        title: "Please Wait",
+        description: "Your booking request is being processed...",
+        variant: "default"
+      });
+      return;
+    }
+
+    if (timeSinceLastSubmit < minInterval) {
+      toast({
+        title: "Too Fast",
+        description: `Please wait ${Math.ceil((minInterval - timeSinceLastSubmit) / 1000)} more seconds before submitting again.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if we're currently rate limited
+    if (rateLimitHelper.isRateLimited()) {
+      const remainingTime = rateLimitHelper.getFormattedRemainingTime();
+      toast({
+        title: "Rate Limited",
+        description: `Please wait ${remainingTime} before trying again. You can clear this in development by running: rateLimitHelper.clearRateLimit() in the console.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLastSubmitTime(now);
+
     // Check authentication
     if (!isAuthenticated || !user) {
+      setIsSubmitting(false);
       toast({
         title: "Authentication Required",
         description: "Please sign in to continue.",
@@ -86,6 +128,7 @@ export default function BookingModal() {
 
     // Validate form
     if (!formData.checkIn || !formData.checkOut) {
+      setIsSubmitting(false);
       toast({
         title: "Missing Information",
         description: "Please select check-in and check-out dates.",
@@ -100,6 +143,7 @@ export default function BookingModal() {
     const today = new Date();
 
     if (checkInDate < today) {
+      setIsSubmitting(false);
       toast({
         title: "Invalid Check-in Date",
         description: "Check-in date cannot be in the past.",
@@ -109,6 +153,7 @@ export default function BookingModal() {
     }
 
     if (checkOutDate <= checkInDate) {
+      setIsSubmitting(false);
       toast({
         title: "Invalid Check-out Date",
         description: "Check-out date must be after check-in date.",
@@ -140,35 +185,84 @@ export default function BookingModal() {
 
       const apiUrl = `/api/booking-requests${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('sitenest_token')}`
-        },
-        body: JSON.stringify(bookingRequestData)
-      });
+      let response: Response;
+      
+      try {
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('sitenest_token')}`
+          },
+          body: JSON.stringify(bookingRequestData)
+        });
+      } catch (networkError) {
+        console.error('❌ Network error:', networkError);
+        throw new Error('Network error. Please check your connection and try again.');
+      }
 
       console.log('📥 Response status:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData: any = {};
+        
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          console.error('❌ Failed to parse error response:', parseError);
+          errorData = { message: 'Server error occurred' };
+        }
+        
         console.error('❌ Error response:', errorData);
         console.error('❌ Validation errors:', errorData.errors);
         console.error('❌ Error details:', errorData.details);
 
-        // Handle room not available error specifically
-        if (errorData.error === 'ROOM_NOT_AVAILABLE') {
+        // Handle rate limiting error specifically
+        if (response.status === 429) {
+          // Record the rate limit for future checks
+          rateLimitHelper.recordRateLimit();
+          
+          const retryAfter = errorData.error?.retryAfter || errorData.retryAfter || 900; // Default to 15 minutes
+          const retryMinutes = Math.ceil(retryAfter / 60);
+          
           toast({
-            title: "Room Not Available",
-            description: `Room ${selectedRoomId} is not available for the selected dates. Please choose different dates or contact us for alternatives.`,
+            title: "Too Many Requests",
+            description: `Please wait ${retryMinutes} minutes before trying again. This helps us maintain service quality for all users. In development, you can clear this by running: rateLimitHelper.clearRateLimit() in the console.`,
             variant: "destructive"
           });
+          return;
+        }
+
+        // Handle room not available error specifically
+        if (errorData.error === 'ROOM_NOT_AVAILABLE') {
+          // Close the booking modal first
+          setIsOpen(false);
+          
+          // Trigger chatbot with room unavailability data
+          const event = new CustomEvent('openChatbotWithUnavailability', {
+            detail: {
+              roomId: selectedRoomId,
+              apartmentId: selectedApartmentId,
+              checkIn: formData.checkIn,
+              checkOut: formData.checkOut,
+              user: {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                cnic: user.cnic,
+                isEmailVerified: user.isEmailVerified,
+                isPhoneVerified: user.isPhoneVerified
+              }
+            }
+          });
+          window.dispatchEvent(event);
           return; // Don't proceed with booking flow
         }
 
         // Show detailed error message if available
-        let errorMessage = errorData.message || 'Failed to create booking request';
+        let errorMessage = errorData.message || errorData.error?.message || 'Failed to create booking request';
         if (errorData.details && errorData.details.length > 0) {
           errorMessage += '\n\nDetails:\n' + errorData.details.join('\n');
         }
@@ -269,7 +363,8 @@ export default function BookingModal() {
         description: error instanceof Error ? error.message : "Failed to submit booking request. Please try again.",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
 
     // Reset form
@@ -354,9 +449,10 @@ export default function BookingModal() {
             </Button>
             <Button
               type="submit"
-              className="flex-1 bg-sitenest-primary hover:bg-sitenest-hover-button text-white"
+              disabled={isSubmitting}
+              className="flex-1 bg-sitenest-primary hover:bg-sitenest-hover-button text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Check Now
+              {isSubmitting ? "Processing..." : "Check Now"}
             </Button>
           </div>
         </form>

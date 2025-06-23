@@ -969,4 +969,62 @@ router.put('/admin/withdrawal-requests/:id/mark-paid', authenticateToken, requir
   }
 });
 
+// Update affiliate commission rate (Admin only)
+router.put('/admin/commission-rate/:affiliateId', authenticateToken, requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const affiliateId = req.params.affiliateId;
+    const { commissionRate } = req.body;
+
+    // Validate commission rate
+    if (typeof commissionRate !== 'number' || commissionRate < 0 || commissionRate > 100) {
+      return res.status(400).json({ 
+        error: 'Commission rate must be a number between 0 and 100' 
+      });
+    }
+
+    // Check if the affiliate exists
+    const affiliate = await db.select()
+      .from(users)
+      .where(and(eq(users.id, affiliateId), eq(users.role, 'affiliate')))
+      .limit(1);
+
+    if (affiliate.length === 0) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+
+    // Update the commission rate
+    const updatedAffiliate = await db.update(users)
+      .set({
+        commissionRate: commissionRate,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, affiliateId))
+      .returning();
+
+    if (updatedAffiliate.length === 0) {
+      return res.status(404).json({ error: 'Failed to update commission rate' });
+    }
+
+    res.json({
+      message: 'Commission rate updated successfully',
+      affiliate: {
+        id: updatedAffiliate[0].id,
+        email: updatedAffiliate[0].email,
+        firstName: updatedAffiliate[0].firstName,
+        lastName: updatedAffiliate[0].lastName,
+        commissionRate: updatedAffiliate[0].commissionRate
+      }
+    });
+
+  } catch (error) {
+    console.error('Update commission rate error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

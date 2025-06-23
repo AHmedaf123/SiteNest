@@ -92,6 +92,33 @@ export class RateLimitConfig {
       });
     }
   });
+
+  // Booking-specific rate limiting (more lenient for authenticated users)
+  static bookingRateLimit = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 10, // limit each IP to 10 booking attempts per 5 minutes
+    message: {
+      error: 'Too many booking attempts',
+      retryAfter: 5 * 60
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req: Request, res: Response) => {
+      log.security('Booking rate limit exceeded', req.ip, req.get('User-Agent'), {
+        endpoint: req.originalUrl,
+        method: req.method,
+        userId: (req as any).user?.id
+      });
+
+      res.status(429).json({
+        error: {
+          message: 'Too many booking attempts. Please wait a few minutes before trying again.',
+          code: 'BOOKING_RATE_LIMIT_EXCEEDED',
+          retryAfter: 5 * 60
+        }
+      });
+    }
+  });
 }
 
 // Security headers configuration

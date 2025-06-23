@@ -33,6 +33,8 @@ export default function ApartmentDetail() {
     content: ""
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [highlightedRoom, setHighlightedRoom] = useState<string | null>(null);
+  const [shouldHighlight, setShouldHighlight] = useState(false);
 
   const { isAuthenticated } = useRealAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -40,6 +42,32 @@ export default function ApartmentDetail() {
   const queryClient = useQueryClient();
 
   const apartmentId = params?.id ? parseInt(params.id) : null;
+
+  // Handle URL parameters for room highlighting
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    const highlightParam = urlParams.get('highlight');
+    
+    if (roomParam && highlightParam === 'true') {
+      setHighlightedRoom(roomParam);
+      setShouldHighlight(true);
+      
+      // Show a toast to indicate the highlighted room
+      setTimeout(() => {
+        toast({
+          title: "Room Highlighted",
+          description: `Room ${roomParam} is highlighted for you!`,
+          duration: 3000,
+        });
+      }, 1000);
+      
+      // Remove highlight after 5 seconds
+      setTimeout(() => {
+        setShouldHighlight(false);
+      }, 5000);
+    }
+  }, [toast]);
 
   const { data: apartment, isLoading } = useQuery<Apartment>({
     queryKey: [`/api/apartments/${apartmentId}`],
@@ -352,7 +380,18 @@ export default function ApartmentDetail() {
                         )}
                         <span className="text-gray-500">/night</span>
                       </div>
-                      <p className="text-sm text-gray-500">Room {apartment.roomNumber}</p>
+                      <p className={`text-sm transition-all duration-500 ${
+                        shouldHighlight && highlightedRoom === apartment.roomNumber 
+                          ? 'text-brand-coral font-bold bg-yellow-100 px-2 py-1 rounded-md animate-pulse' 
+                          : 'text-gray-500'
+                      }`}>
+                        Room {apartment.roomNumber}
+                        {shouldHighlight && highlightedRoom === apartment.roomNumber && (
+                          <span className="ml-2 text-xs bg-brand-coral text-white px-2 py-1 rounded-full">
+                            Selected for you!
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
 

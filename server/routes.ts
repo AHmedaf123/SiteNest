@@ -11,6 +11,7 @@ import fs from "fs";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { AvailabilityService } from "./services/availability.service";
 import { insertCustomerSchema, insertBookingSchema, insertApartmentSchema, insertReviewSchema, insertBookingRequestSchema } from "@shared/schema";
 import authRoutes, { authenticateToken } from "./auth-routes";
 import googleAuthRoutes from "./google-auth";
@@ -819,7 +820,395 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Initialize availability service
+  const availabilityService = new AvailabilityService();
 
+  // Enhanced Availability Routes
+
+  // Enhanced calendar availability with check-in/check-out date range
+  app.get("/api/enhanced-availability/calendar/:apartmentId", async (req, res) => {
+    try {
+      const apartmentId = parseInt(req.params.apartmentId);
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ 
+          message: "Start date and end date are required (YYYY-MM-DD format)" 
+        });
+      }
+
+      const calendarData = await availabilityService.getCalendarAvailability(
+        apartmentId,
+        startDate as string,
+        endDate as string
+      );
+
+      res.json({
+        success: true,
+        data: calendarData,
+        apartmentId,
+        dateRange: {
+          startDate: startDate as string,
+          endDate: endDate as string
+        }
+      });
+    } catch (error) {
+      log.error("Enhanced calendar availability error", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to fetch calendar availability" 
+      });
+    }
+  });
+
+  // Bulk availability check for multiple apartments
+  app.post("/api/enhanced-availability/bulk", async (req, res) => {
+    try {
+      const { apartmentIds, checkIn, checkOut, includePendingReservations = true } = req.body;
+
+      if (!apartmentIds || !Array.isArray(apartmentIds) || !checkIn || !checkOut) {
+        return res.status(400).json({
+          success: false,
+          message: "apartmentIds (array), checkIn, and checkOut are required"
+        });
+      }
+
+      const results = await availabilityService.checkBulkAvailability({
+        apartmentIds,
+        checkIn,
+        checkOut,
+        includePendingReservations
+      });
+
+      res.json({
+        success: true,
+        data: results,
+        query: { apartmentIds, checkIn, checkOut }
+      });
+    } catch (error) {
+      log.error("Bulk availability check error", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to check bulk availability"
+      });
+    }
+  });
+
+  // Date range availability with available periods
+  app.get("/api/enhanced-availability/date-range/:apartmentId", async (req, res) => {
+    try {
+      const apartmentId = parseInt(req.params.apartmentId);
+      const { startDate, endDate, minStayDays } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate and endDate are required (YYYY-MM-DD format)"
+        });
+      }
+
+      const results = await availabilityService.getDateRangeAvailability({
+        apartmentId,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        minStayDays: minStayDays ? parseInt(minStayDays as string) : undefined
+      });
+
+      res.json({
+        success: true,
+        data: results
+      });
+    } catch (error) {
+      log.error("Date range availability error", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch date range availability"
+      });
+    }
+  });
+
+  // Create temporary reservation (hold)
+  app.post("/api/enhanced-availability/reserve", authenticateToken, async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { apartmentId, checkIn, checkOut, holdMinutes = 45 } = req.body;
+
+      if (!apartmentId || !checkIn || !checkOut) {
+        return res.status(400).json({
+          success: false,
+          message: "apartmentId, checkIn, and checkOut are required"
+        });
+      }
+
+      const reservation = await availabilityService.createReservation(
+        user.id,
+        apartmentId,
+        checkIn,
+        checkOut,
+        holdMinutes
+      );
+
+      res.json({
+        success: true,
+        data: reservation,
+        message: `Room reserved for ${holdMinutes} minutes`
+      });
+    } catch (error) {
+      log.error("Create reservation error", error);
+      if (error instanceof BookingNotAvailableError) {
+        res.status(409).json({
+          success: false,
+          message: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: "Failed to create reservation"
+        });
+      }
+    }
+  });
+
+  // Release expired reservations (admin endpoint)
+  app.post("/api/enhanced-availability/release-expired", authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+      const releasedCount = await availabilityService.releaseExpiredReservations();
+
+      res.json({
+        success: true,
+        data: {
+          releasedCount,
+          message: `Released ${releasedCount} expired reservations`
+        }
+      });
+    } catch (error) {
+      log.error("Release expired reservations error", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to release expired reservations"
+      });
+    }
+  });
+
+  // Enhanced availability check with detailed information
+  app.post("/api/enhanced-availability/check", async (req, res) => {
+    try {
+      const { apartmentId, checkIn, checkOut, excludeBookingId, includePendingReservations = true } = req.body;
+
+      if (!apartmentId || !checkIn || !checkOut) {
+        return res.status(400).json({
+          success: false,
+          message: "apartmentId, checkIn, and checkOut are required"
+        });
+      }
+
+      const result = await availabilityService.checkAvailability({
+        apartmentId,
+        checkIn,
+        checkOut,
+        excludeBookingId,
+        includePendingReservations
+      });
+
+      res.json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      log.error("Enhanced availability check error", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to check availability"
+      });
+    }
+  });
+
+  // Test route to verify API is working
+  app.get("/api/test-room-search", (req, res) => {
+    res.json({ message: "Room search API is working!", timestamp: new Date().toISOString() });
+  });
+
+  // Search available rooms by check-in and check-out dates
+  app.get("/api/rooms/search-availability", async (req, res) => {
+    try {
+      const { checkIn, checkOut, guests } = req.query;
+
+      // Validate required parameters
+      if (!checkIn || !checkOut) {
+        return res.status(400).json({
+          success: false,
+          message: "Check-in and check-out dates are required (YYYY-MM-DD format)"
+        });
+      }
+
+      // Validate date format and logic
+      const checkInDate = new Date(checkIn as string);
+      const checkOutDate = new Date(checkOut as string);
+
+      if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid date format. Use YYYY-MM-DD"
+        });
+      }
+
+      if (checkInDate >= checkOutDate) {
+        return res.status(400).json({
+          success: false,
+          message: "Check-out date must be after check-in date"
+        });
+      }
+
+      // Check if dates are in the past
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (checkInDate < today) {
+        return res.status(400).json({
+          success: false,
+          message: "Check-in date cannot be in the past"
+        });
+      }
+
+      // Calculate stay duration
+      const stayDurationMs = checkOutDate.getTime() - checkInDate.getTime();
+      const stayDurationDays = Math.ceil(stayDurationMs / (1000 * 60 * 60 * 24));
+
+      // Get all apartments
+      const allApartments = await storage.getApartments();
+
+      if (allApartments.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            checkIn: checkIn as string,
+            checkOut: checkOut as string,
+            stayDuration: stayDurationDays,
+            availableRooms: [],
+            summary: {
+              totalRooms: 0,
+              availableRooms: 0,
+              bookedRooms: 0
+            }
+          }
+        });
+      }
+
+      // Check availability for all apartments using bulk availability check
+      const apartmentIds = allApartments.map(apt => apt.id);
+      const bulkAvailabilityResult = await availabilityService.checkBulkAvailability({
+        apartmentIds,
+        checkIn: checkIn as string,
+        checkOut: checkOut as string,
+        includePendingReservations: true
+      });
+
+      // Build available rooms response
+      const availableRooms = [];
+      const bookedRooms = [];
+      
+      // Parse guest count once outside the loop
+      const guestCount = guests ? parseInt(guests as string) : 0;
+
+      for (const apartment of allApartments) {
+        const availability = bulkAvailabilityResult[apartment.id];
+        
+        // Calculate pricing
+        let basePrice = apartment.price * stayDurationDays;
+        let discountedPrice = basePrice;
+        
+        // Apply discount if available
+        if (apartment.discountPercentage && apartment.discountPercentage > 0) {
+          const discountAmount = (basePrice * apartment.discountPercentage) / 100;
+          discountedPrice = basePrice - discountAmount;
+        }
+
+        // Estimate max guests (2 per bedroom is a reasonable assumption)
+        const maxGuests = apartment.bedrooms * 2;
+
+        // Filter by guest count if specified
+        if (guestCount > 0 && guestCount > maxGuests) {
+          continue; // Skip this room if it can't accommodate the requested guests
+        }
+
+        const roomData = {
+          id: apartment.id,
+          roomNumber: apartment.roomNumber,
+          title: apartment.title,
+          description: apartment.description,
+          bedrooms: apartment.bedrooms,
+          bathrooms: apartment.bathrooms,
+          squareFeet: apartment.squareFeet,
+          maxGuests,
+          pricePerNight: apartment.price,
+          totalPrice: discountedPrice,
+          originalPrice: basePrice,
+          discountPercentage: apartment.discountPercentage || 0,
+          savings: basePrice - discountedPrice,
+          amenities: apartment.amenities || [],
+          images: apartment.images || [apartment.imageUrl],
+          mainImage: apartment.imageUrl,
+          isAvailable: availability.isAvailable,
+          stayDuration: stayDurationDays
+        };
+
+        if (availability.isAvailable) {
+          availableRooms.push(roomData);
+        } else {
+          bookedRooms.push({
+            ...roomData,
+            unavailableReason: availability.reason,
+            availableFrom: availability.availableFrom,
+            availableUntil: availability.availableUntil,
+            conflictingBookings: availability.conflictingBookings?.length || 0,
+            conflictingReservations: availability.conflictingReservations?.length || 0
+          });
+        }
+      }
+
+      // Sort available rooms by price (lowest first)
+      availableRooms.sort((a, b) => a.totalPrice - b.totalPrice);
+
+      // Sort booked rooms by room number
+      bookedRooms.sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
+
+      res.json({
+        success: true,
+        data: {
+          checkIn: checkIn as string,
+          checkOut: checkOut as string,
+          stayDuration: stayDurationDays,
+          requestedGuests: guestCount || null,
+          availableRooms,
+          bookedRooms,
+          summary: {
+            totalRooms: allApartments.length,
+            availableRooms: availableRooms.length,
+            bookedRooms: bookedRooms.length,
+            averagePricePerNight: availableRooms.length > 0 
+              ? Math.round(availableRooms.reduce((sum, room) => sum + room.pricePerNight, 0) / availableRooms.length)
+              : 0,
+            priceRange: availableRooms.length > 0 
+              ? {
+                  min: Math.min(...availableRooms.map(room => room.totalPrice)),
+                  max: Math.max(...availableRooms.map(room => room.totalPrice))
+                }
+              : null
+          }
+        }
+      });
+
+    } catch (error) {
+      log.error("Room availability search error", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to search room availability"
+      });
+    }
+  });
 
   // Booking Request endpoints
   app.get("/api/booking-requests", authenticateToken, async (req, res) => {
@@ -881,8 +1270,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (registrationMetric && registrationMetric.affiliateId) {
           const affiliate = users.find(u => u.id === registrationMetric.affiliateId);
           if (affiliate) {
-            // Calculate potential commission (10% of total amount)
-            const potentialCommission = totalAmount ? Math.round(totalAmount * 0.10) : 0;
+            // Calculate potential commission using affiliate's individual commission rate
+            const commissionRate = (affiliate.commissionRate || 10) / 100; // Convert percentage to decimal
+            const potentialCommission = totalAmount ? Math.round(totalAmount * commissionRate) : 0;
 
             // Check if commission has already been created for this booking
             const existingEarning = allEarnings.find(e => e.bookingId === request.id);
@@ -1402,8 +1792,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (affiliateInfo) {
-            // Calculate 10% commission
-            const commissionAmount = Math.round(totalAmount * 0.10);
+            // Get affiliate user data to fetch their individual commission rate
+            const affiliateUser = await db.select().from(users).where(eq(users.id, affiliateInfo.affiliateId)).limit(1);
+            const affiliate = affiliateUser[0];
+            const individualCommissionRate = affiliate?.commissionRate || 10;
+            
+            // Calculate commission using affiliate's individual commission rate
+            const commissionAmount = Math.round(totalAmount * (individualCommissionRate / 100));
 
             // Create affiliate earning record
             await storage.createAffiliateEarning({
@@ -1411,7 +1806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               bookingId: updatedRequest.id,
               userId: updatedRequest.userId,
               commissionAmount,
-              commissionRate: 10,
+              commissionRate: individualCommissionRate,
               baseAmount: totalAmount,
               status: 'pending'
             });
@@ -2143,7 +2538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Enhanced response format
         const enhancedResult = {
           response: result.response,
-          type: result.bookingData ? 'booking_summary' : 'text',
+          type: result.bookingData?.type || (result.bookingData ? 'booking_summary' : 'text'),
           data: result.bookingData,
           quickActions: result.quickActions || ['open_whatsapp', 'check_availability', 'pricing'],
           intent: 'processed',

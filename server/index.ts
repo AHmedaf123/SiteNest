@@ -27,6 +27,7 @@ import { cacheService } from "./services/cache.service";
 import { DatabaseHealthMonitor, databaseClient } from "./db";
 import { memoryOptimizer } from "./utils/memory-optimizer";
 import { ChatbotDataSyncService } from "./services/chatbot-data-sync.service";
+import { reservationCleanup } from "./utils/reservation-cleanup";
 
 // Validate configuration on startup
 validateConfig();
@@ -41,6 +42,8 @@ app.use(cors(corsConfig()));
 // Rate limiting
 app.use('/api/auth', RateLimitConfig.authRateLimit);
 app.use('/api/upload', RateLimitConfig.uploadRateLimit);
+app.use('/api/booking-requests', RateLimitConfig.bookingRateLimit);
+app.use('/api/reservations', RateLimitConfig.bookingRateLimit);
 app.use('/api', RateLimitConfig.apiRateLimit);
 
 // Request parsing with size limits
@@ -201,6 +204,10 @@ async function initializeServices(): Promise<void> {
       log.info('✅ Memory optimizer started');
     }
 
+    // Start reservation cleanup service
+    reservationCleanup.startCleanup();
+    log.info('✅ Reservation cleanup service started');
+
     log.info('🎉 All enterprise services initialized successfully');
   } catch (error) {
     log.error('Service initialization failed', error);
@@ -267,6 +274,10 @@ async function gracefulShutdown(): Promise<void> {
       memoryOptimizer.stop();
       log.info('✅ Memory optimizer stopped');
     }
+
+    // Shutdown reservation cleanup service
+    reservationCleanup.stopCleanup();
+    log.info('✅ Reservation cleanup service stopped');
 
     // Shutdown cache service
     await cacheService.shutdown();

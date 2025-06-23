@@ -102,7 +102,8 @@ const authenticateToken = async (req: Request, res: Response, next: any) => {
               isEmailVerified: true,
               isPhoneVerified: true,
               authProvider: 'email',
-              country: 'Pakistan'
+              country: 'Pakistan',
+              commissionRate: 10
             });
             log.info('Mock admin user created in database');
           } else {
@@ -127,7 +128,8 @@ const authenticateToken = async (req: Request, res: Response, next: any) => {
               phoneVerificationToken: null,
               googleId: null,
               authProvider: 'email',
-              country: 'Pakistan'
+              country: 'Pakistan',
+              commissionRate: 10
             };
             return next();
           }
@@ -159,7 +161,8 @@ const authenticateToken = async (req: Request, res: Response, next: any) => {
       phoneVerificationToken: null,
       googleId: null,
       authProvider: 'email',
-      country: 'Pakistan'
+      country: 'Pakistan',
+      commissionRate: 10
     };
     return next();
   }

@@ -273,6 +273,91 @@ export class EnhancedAIService {
         context = await this.initializeContext(sessionId, userId);
       }
 
+      // Handle unavailability scenario
+      if (additionalContext?.bookingData?.isUnavailable && userMessage.includes("not available")) {
+        const bookingData = additionalContext.bookingData;
+        const checkInDate = new Date(bookingData.checkIn).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const checkOutDate = new Date(bookingData.checkOut).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        // Since we know the room is unavailable, directly find alternatives
+        try {
+          const { ChatbotAvailabilityService } = await import('../chatbot-availability-service');
+          
+          // Get all apartments and check availability for alternatives
+          const { storage } = await import('../storage');
+          const allApartments = await storage.getApartments();
+          const alternatives = [];
+
+          // Convert dates to proper format for storage layer
+          const checkInDate = new Date(bookingData.checkIn).toISOString();
+          const checkOutDate = new Date(bookingData.checkOut).toISOString();
+
+          for (const apartment of allApartments) {
+            // Skip the unavailable apartment
+            if (apartment.id === bookingData.apartmentId) continue;
+
+            try {
+              const isAvailable = await storage.checkAvailability(
+                apartment.id,
+                checkInDate,
+                checkOutDate
+              );
+
+              if (isAvailable) {
+                alternatives.push({
+                  id: apartment.id,
+                  apartmentId: apartment.id,
+                  roomNumber: apartment.roomNumber,
+                  title: apartment.title,
+                  price: apartment.price,
+                  bedrooms: apartment.bedrooms,
+                  imageUrl: apartment.imageUrl,
+                  description: apartment.description,
+                  isAvailable: true
+                });
+              }
+            } catch (error) {
+              log.error(`Error checking availability for apartment ${apartment.id}:`, error);
+              // Continue to next apartment
+            }
+          }
+
+          if (alternatives.length > 0) {
+            const response = `I'm sorry, Room ${bookingData.roomId} is not available from ${checkInDate} to ${checkOutDate}. However, I found these other available options for you:`;
+            
+            return {
+              response,
+              quickActions: ['open_whatsapp', 'check_other_dates', 'contact_support'],
+              bookingData: {
+                type: 'availability_carousel',
+                apartments: alternatives.slice(0, 3) // Limit to 3 alternatives
+              }
+            };
+          } else {
+            const response = `I'm sorry, Room ${bookingData.roomId} is not available from ${checkInDate} to ${checkOutDate}, and we don't have any alternative rooms available for those dates. Please try different dates or contact our support team at 0311-5197087 for more options.`;
+            
+            return {
+              response,
+              quickActions: ['check_other_dates', 'open_whatsapp', 'contact_support']
+            };
+          }
+        } catch (error) {
+          log.error('Error checking alternatives for unavailable room:', error);
+          return {
+            response: `I'm sorry, Room ${bookingData.roomId} is not available for the selected dates. Please contact us at 0311-5197087 to check for alternatives or different dates.`,
+            quickActions: ['open_whatsapp', 'contact_support']
+          };
+        }
+      }
+
       // Handle booking data if provided in additionalContext
       if (additionalContext?.bookingData) {
         const bookingData = additionalContext.bookingData;
