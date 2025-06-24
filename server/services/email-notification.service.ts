@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { EMAIL_CONFIG, BUSINESS_CONFIG } from '../config/index.js';
+import { log } from '../utils/logger.js';
 
 interface BookingEmailData {
   customerName: string;
@@ -25,6 +26,124 @@ interface AvailabilityEmailData {
     title: string;
     price: number;
   }>;
+}
+
+interface UserRegistrationEmailData {
+  userName: string;
+  userEmail: string;
+  registrationDate: string;
+  verificationToken?: string;
+  loginMethod: string;
+}
+
+interface ProfileUpdateEmailData {
+  userName: string;
+  userEmail: string;
+  updatedFields: string[];
+  updateDate: string;
+}
+
+interface PasswordChangeEmailData {
+  userName: string;
+  userEmail: string;
+  changeDate: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+interface LoginAttemptEmailData {
+  userName: string;
+  userEmail: string;
+  loginDate: string;
+  ipAddress?: string;
+  userAgent?: string;
+  success: boolean;
+  failureReason?: string;
+}
+
+interface AffiliateApplicationEmailData {
+  applicantName: string;
+  applicantEmail: string;
+  applicationDate: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewNotes?: string;
+  reviewerName?: string;
+}
+
+interface PaymentEmailData {
+  customerName: string;
+  customerEmail: string;
+  amount: number;
+  paymentMethod: string;
+  transactionId?: string;
+  status: 'success' | 'failed' | 'pending' | 'refunded';
+  bookingId?: string;
+  roomNumber?: string;
+}
+
+interface ErrorNotificationEmailData {
+  userEmail?: string;
+  userName?: string;
+  errorType: string;
+  errorMessage: string;
+  errorDate: string;
+  userAction?: string;
+  stackTrace?: string;
+}
+
+interface AdminNotificationEmailData {
+  adminEmail: string;
+  adminName: string;
+  notificationType: string;
+  message: string;
+  actionRequired?: boolean;
+  relatedData?: any;
+}
+
+interface AIResponseEmailData {
+  customerName: string;
+  customerEmail: string;
+  query: string;
+  aiResponse: string;
+  alternativeRooms?: Array<{
+    roomNumber: string;
+    title: string;
+    price: number;
+  }>;
+  responseDate: string;
+}
+
+interface FormSubmissionEmailData {
+  userName?: string;
+  userEmail: string;
+  formType: string;
+  formData: any;
+  submissionDate: string;
+  status: 'success' | 'failed' | 'pending';
+  errorMessage?: string;
+}
+
+interface BookingStatusEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingId: string;
+  roomNumber: string;
+  oldStatus: string;
+  newStatus: string;
+  statusChangeDate: string;
+  adminNotes?: string;
+}
+
+interface RoomAvailabilityUpdateEmailData {
+  customerEmail?: string;
+  customerName?: string;
+  roomNumber: string;
+  availabilityDate: string;
+  isAvailable: boolean;
+  priceChange?: {
+    oldPrice: number;
+    newPrice: number;
+  };
 }
 
 export class EmailNotificationService {
@@ -319,18 +438,4 @@ export class EmailNotificationService {
               </p>
             </div>
           </div>
-        `
-      };
 
-      await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Booking confirmation email sent to: ${customerEmail}`);
-      return true;
-
-    } catch (error) {
-      console.error('❌ Failed to send booking confirmation email:', error);
-      return false;
-    }
-  }
-}
-
-export const emailNotificationService = new EmailNotificationService();

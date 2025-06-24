@@ -50,12 +50,7 @@ export default function EnhancedApartmentCarousel() {
     }));
   };
 
-  const openBookingModal = (roomNumber: string) => {
-    const event = new CustomEvent('openBookingModal', {
-      detail: { roomId: roomNumber }
-    });
-    window.dispatchEvent(event);
-  };
+
 
   if (isLoading) {
     return (

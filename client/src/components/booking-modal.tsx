@@ -4,17 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useRealAuth } from "@/hooks/useRealAuth";
 import { useBookingDates } from "@/contexts/BookingContext";
+import { useQuery } from "@tanstack/react-query";
 import Logo from "@/components/ui/logo";
 import { fetchWithRetry } from "@/utils/retry";
 import { rateLimitHelper } from "@/utils/rate-limit-helper";
+import type { Apartment } from "@shared/schema";
 
 export default function BookingModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [selectedApartmentId, setSelectedApartmentId] = useState<number | null>(null);
+  const [isRoomLocked, setIsRoomLocked] = useState(false); // New state to track if room selection is locked
   const [formData, setFormData] = useState({
     checkIn: "",
     checkOut: ""
@@ -23,6 +27,12 @@ export default function BookingModal() {
   const [lastSubmitTime, setLastSubmitTime] = useState<number>(0);
   const { isAuthenticated, user } = useRealAuth();
   const { setBookingDates } = useBookingDates();
+
+  // Fetch apartments for room selection dropdown
+  const { data: apartments = [], isLoading: apartmentsLoading } = useQuery<Apartment[]>({
+    queryKey: ["/api/apartments"],
+    enabled: isOpen && !isRoomLocked, // Only fetch when modal is open and room is not locked
+  });
 
   const getRoomTitle = (roomId: string) => {
     const roomTitles: { [key: string]: string } = {
@@ -50,11 +60,17 @@ export default function BookingModal() {
       }
 
       setIsOpen(true);
-      if (event.detail?.roomId) {
+      
+      // Check if this is for a specific apartment (room should be locked)
+      if (event.detail?.roomId && event.detail?.apartmentId && event.detail.roomId !== 'any') {
         setSelectedRoomId(event.detail.roomId);
-      }
-      if (event.detail?.apartmentId) {
         setSelectedApartmentId(event.detail.apartmentId);
+        setIsRoomLocked(true); // Lock room selection for specific apartment bookings
+      } else {
+        // General booking - allow room selection
+        setSelectedRoomId("");
+        setSelectedApartmentId(null);
+        setIsRoomLocked(false); // Enable room selection for general bookings
       }
     };
 
@@ -72,6 +88,14 @@ export default function BookingModal() {
         checkIn: field === 'checkIn' ? value : formData.checkIn,
         checkOut: field === 'checkOut' ? value : formData.checkOut
       });
+    }
+  };
+
+  const handleRoomSelection = (apartmentId: string) => {
+    const apartment = apartments.find(apt => apt.id.toString() === apartmentId);
+    if (apartment) {
+      setSelectedApartmentId(apartment.id);
+      setSelectedRoomId(apartment.roomNumber);
     }
   };
 
@@ -132,6 +156,17 @@ export default function BookingModal() {
       toast({
         title: "Missing Information",
         description: "Please select check-in and check-out dates.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate room selection
+    if (!selectedRoomId || !selectedApartmentId) {
+      setIsSubmitting(false);
+      toast({
+        title: "Missing Information",
+        description: "Please select a room to book.",
         variant: "destructive"
       });
       return;
@@ -377,6 +412,12 @@ export default function BookingModal() {
   const handleClose = () => {
     setIsOpen(false);
     setSelectedRoomId("");
+    setSelectedApartmentId(null);
+    setIsRoomLocked(false);
+    setFormData({
+      checkIn: "",
+      checkOut: ""
+    });
   };
 
   return (
@@ -428,14 +469,47 @@ export default function BookingModal() {
             </div>
           </div>
 
-          {/* Show selected room (read-only) */}
+          {/* Room Selection - Locked or Flexible */}
           <div className="space-y-2">
-            <Label htmlFor="selectedRoom">Selected Room</Label>
-            <div className="p-3 bg-gray-50 border rounded-md">
-              <span className="font-medium text-sitenest-primary">
-                Room {selectedRoomId} - {getRoomTitle(selectedRoomId)}
-              </span>
-            </div>
+            <Label htmlFor="roomSelection">
+              {isRoomLocked ? "Selected Room" : "Choose Room *"}
+            </Label>
+            {isRoomLocked ? (
+              // Locked room display (for specific apartment bookings)
+              <div className="p-3 bg-gray-50 border rounded-md">
+                <span className="font-medium text-sitenest-primary">
+                  Room {selectedRoomId} - {getRoomTitle(selectedRoomId)}
+                </span>
+                <p className="text-xs text-gray-500 mt-1">
+                  Room pre-selected for this booking
+                </p>
+              </div>
+            ) : (
+              // Flexible room selection (for general bookings)
+              <Select
+                value={selectedApartmentId?.toString() || ""}
+                onValueChange={handleRoomSelection}
+                disabled={apartmentsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={apartmentsLoading ? "Loading rooms..." : "Select a room"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {apartments.map((apartment) => (
+                    <SelectItem key={apartment.id} value={apartment.id.toString()}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          Room {apartment.roomNumber} - {apartment.title}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          PKR {apartment.price}/night • {apartment.bedrooms} bed • {apartment.bathrooms} bath
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="flex space-x-4 pt-4">

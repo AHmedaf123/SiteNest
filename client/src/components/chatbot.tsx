@@ -557,7 +557,12 @@ export default function Chatbot() {
         message = "Where is SiteNest located?";
         break;
       case 'book_now':
-        message = "I want to book a room now";
+        // Trigger general booking modal (room selection enabled)
+        const bookingEvent = new CustomEvent('openBookingModal', {
+          detail: { roomId: 'any', apartmentId: 0 }
+        });
+        window.dispatchEvent(bookingEvent);
+        message = "Opening booking form for you...";
         break;
       case 'voice_mode':
         setIsVoiceMode(!isVoiceMode);

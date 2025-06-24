@@ -54,7 +54,10 @@ export default function Header() {
       setIsMobileMenuOpen(false);
       return;
     }
-    const event = new CustomEvent('openBookingModal');
+    // Trigger general booking modal (room selection enabled)
+    const event = new CustomEvent('openBookingModal', {
+      detail: { roomId: 'any', apartmentId: 0 }
+    });
     window.dispatchEvent(event);
     setIsMobileMenuOpen(false);
   };

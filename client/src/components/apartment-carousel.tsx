@@ -44,10 +44,7 @@ export default function ApartmentCarousel() {
     return () => stopAutoScroll();
   }, [apartments.length]);
 
-  const openBookingModal = (roomId: string) => {
-    const event = new CustomEvent('openBookingModal', { detail: { roomId } });
-    window.dispatchEvent(event);
-  };
+
 
   if (isLoading) {
     return (
